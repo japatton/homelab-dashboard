@@ -9,7 +9,7 @@ const DEBOUNCE_MS = 1000
 export function useTopology() {
   const queryClient = useQueryClient()
   const { on } = useSocket()
-  const saveTimer = useRef<ReturnType<typeof setTimeout>>()
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const { data, isLoading, error } = useQuery<TopologyGraph>({
     queryKey: ['topology'],
