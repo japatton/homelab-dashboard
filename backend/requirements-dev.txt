@@ -4,7 +4,7 @@
 # Test runner + plugins
 pytest==8.3.3
 pytest-asyncio==0.24.0
-pytest-cov==5.0.0
+pytest-cov==7.1.0
 pytest-mock==3.14.0
 
 # HTTP mocking for integration tests (httpx-based clients)
