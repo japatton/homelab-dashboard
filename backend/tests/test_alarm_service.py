@@ -13,6 +13,7 @@ Covers:
   - Acknowledge / dismiss / clear-dismissed state transitions.
   - Distinct sources with identical fingerprints don't collide.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -102,7 +103,7 @@ async def test_redisplay_after_dismiss_unsets_dismissed(initialised_db):
 
     assert await dismiss(alarm_id) is True
     rows_after_dismiss = await list_alarms()
-    assert rows_after_dismiss == []      # falls out of default feed
+    assert rows_after_dismiss == []  # falls out of default feed
     # But a subsequent merge un-dismisses.
     await upsert_alarms([_input()])
     rows = await list_alarms()
@@ -112,12 +113,14 @@ async def test_redisplay_after_dismiss_unsets_dismissed(initialised_db):
 
 
 async def test_summary_counts_by_severity(initialised_db):
-    await upsert_alarms([
-        _input(fingerprint="a", severity="critical"),
-        _input(fingerprint="b", severity="high"),
-        _input(fingerprint="c", severity="high"),
-        _input(fingerprint="d", severity="info"),
-    ])
+    await upsert_alarms(
+        [
+            _input(fingerprint="a", severity="critical"),
+            _input(fingerprint="b", severity="high"),
+            _input(fingerprint="c", severity="high"),
+            _input(fingerprint="d", severity="info"),
+        ]
+    )
     s = await get_summary()
     assert s.total == 4
     assert s.unacknowledged == 4
@@ -144,10 +147,12 @@ async def test_acknowledge_unknown_returns_false(initialised_db):
 
 
 async def test_summary_excludes_dismissed(initialised_db):
-    await upsert_alarms([
-        _input(fingerprint="keep", severity="high"),
-        _input(fingerprint="gone", severity="critical"),
-    ])
+    await upsert_alarms(
+        [
+            _input(fingerprint="keep", severity="high"),
+            _input(fingerprint="gone", severity="critical"),
+        ]
+    )
     rows = await list_alarms()
     gone = next(r for r in rows if r.fingerprint == "gone")
     await dismiss(gone.id)
@@ -159,11 +164,13 @@ async def test_summary_excludes_dismissed(initialised_db):
 
 
 async def test_list_filters(initialised_db):
-    await upsert_alarms([
-        _input(source="opnsense", fingerprint="a", severity="high"),
-        _input(source="firewalla", fingerprint="b", severity="high"),
-        _input(source="firewalla", fingerprint="c", severity="critical"),
-    ])
+    await upsert_alarms(
+        [
+            _input(source="opnsense", fingerprint="a", severity="high"),
+            _input(source="firewalla", fingerprint="b", severity="high"),
+            _input(source="firewalla", fingerprint="c", severity="critical"),
+        ]
+    )
     # Source filter
     ops = await list_alarms(source="opnsense")
     assert len(ops) == 1
@@ -183,10 +190,12 @@ async def test_list_include_dismissed(initialised_db):
 
 
 async def test_clear_dismissed_deletes_only_dismissed(initialised_db):
-    await upsert_alarms([
-        _input(fingerprint="keep"),
-        _input(fingerprint="kill"),
-    ])
+    await upsert_alarms(
+        [
+            _input(fingerprint="keep"),
+            _input(fingerprint="kill"),
+        ]
+    )
     rows = await list_alarms()
     to_kill = next(r for r in rows if r.fingerprint == "kill")
     await dismiss(to_kill.id)

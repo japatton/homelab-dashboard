@@ -14,25 +14,32 @@ log = logging.getLogger(__name__)
 
 # Ports that strongly suggest a specific device type
 _PORT_TYPE_MAP: dict[int, str] = {
-    554:  "camera",   # RTSP
+    554: "camera",  # RTSP
     8554: "camera",
-    7080: "camera",   # UniFi Protect camera HTTP
+    7080: "camera",  # UniFi Protect camera HTTP
     2323: "camera",
-    179:  "gateway",  # BGP
-    520:  "gateway",  # RIP
+    179: "gateway",  # BGP
+    520: "gateway",  # RIP
     1194: "gateway",  # OpenVPN
     3000: "server",
     8080: "server",
     8443: "server",
     9000: "server",
     5000: "server",
-    2375: "server",   # Docker
+    2375: "server",  # Docker
     2376: "server",
 }
 
 _SERVICE_LAUNCH_PORTS = {
-    80: "http", 443: "https", 8080: "http", 8443: "https",
-    8888: "http", 3000: "http", 5000: "http", 9000: "http", 9090: "http",
+    80: "http",
+    443: "https",
+    8080: "http",
+    8443: "https",
+    8888: "http",
+    3000: "http",
+    5000: "http",
+    9000: "http",
+    9090: "http",
     9443: "https",
 }
 
@@ -40,7 +47,6 @@ _SERVICE_LAUNCH_PORTS = {
 def _classify_from_nmap(host: NmapHost) -> tuple[DeviceType, float]:
     """Return (device_type, confidence) from nmap host data."""
     open_ports = {p.port for p in host.ports}
-    services = {p.port: p.service for p in host.ports}
     os = (host.os_guess or "").lower()
 
     # Camera signals
@@ -81,14 +87,20 @@ def _build_services(host: NmapHost) -> list[DeviceService]:
         launch_url = None
         if p.port in _SERVICE_LAUNCH_PORTS:
             scheme = _SERVICE_LAUNCH_PORTS[p.port]
-            launch_url = f"{scheme}://{host.ip}:{p.port}" if p.port not in (80, 443) else f"{scheme}://{host.ip}"
-        services.append(DeviceService(
-            port=p.port,
-            protocol=p.protocol,
-            name=p.service or "unknown",
-            version=p.version,
-            launch_url=launch_url,
-        ))
+            launch_url = (
+                f"{scheme}://{host.ip}:{p.port}"
+                if p.port not in (80, 443)
+                else f"{scheme}://{host.ip}"
+            )
+        services.append(
+            DeviceService(
+                port=p.port,
+                protocol=p.protocol,
+                name=p.service or "unknown",
+                version=p.version,
+                launch_url=launch_url,
+            )
+        )
     return services
 
 
@@ -116,18 +128,28 @@ async def merge_nmap_result(result: NmapResult) -> list[Device]:
             meta_json = json.dumps(metadata)
 
             # Check if device exists
-            row = await (await db.execute(
-                "SELECT id, position_x, position_y, label FROM devices WHERE id = ?",
-                (device_id,)
-            )).fetchone()
+            row = await (
+                await db.execute(
+                    "SELECT id, position_x, position_y, label FROM devices WHERE id = ?",
+                    (device_id,),
+                )
+            ).fetchone()
 
             if row:
                 await db.execute(
                     """UPDATE devices SET ip=?, mac=?, hostname=?, device_type=?,
                        confidence=?, metadata=?, is_online=1, last_seen=?
                        WHERE id=?""",
-                    (host.ip, host.mac, host.hostname, device_type,
-                     confidence, meta_json, now, device_id),
+                    (
+                        host.ip,
+                        host.mac,
+                        host.hostname,
+                        device_type,
+                        confidence,
+                        meta_json,
+                        now,
+                        device_id,
+                    ),
                 )
             else:
                 await db.execute(
@@ -135,8 +157,17 @@ async def merge_nmap_result(result: NmapResult) -> list[Device]:
                        (id, mac, ip, hostname, device_type, confidence, metadata,
                         is_online, first_seen, last_seen)
                        VALUES (?,?,?,?,?,?,?,1,?,?)""",
-                    (device_id, host.mac, host.ip, host.hostname,
-                     device_type, confidence, meta_json, now, now),
+                    (
+                        device_id,
+                        host.mac,
+                        host.ip,
+                        host.hostname,
+                        device_type,
+                        confidence,
+                        meta_json,
+                        now,
+                        now,
+                    ),
                 )
 
             # Persist services — replace the full set for this device.
@@ -144,24 +175,28 @@ async def merge_nmap_result(result: NmapResult) -> list[Device]:
 
             await db.commit()
 
-            updated.append(Device(
-                id=device_id,
-                mac=host.mac,
-                ip=host.ip,
-                hostname=host.hostname,
-                device_type=device_type,  # type: ignore[arg-type]
-                status="online",
-                confidence=confidence,
-                services=services,
-                metadata=metadata,
-                is_online=True,
-                last_seen=datetime.fromisoformat(now),
-            ))
+            updated.append(
+                Device(
+                    id=device_id,
+                    mac=host.mac,
+                    ip=host.ip,
+                    hostname=host.hostname,
+                    device_type=device_type,  # type: ignore[arg-type]
+                    status="online",
+                    confidence=confidence,
+                    services=services,
+                    metadata=metadata,
+                    is_online=True,
+                    last_seen=datetime.fromisoformat(now),
+                )
+            )
 
     return updated
 
 
-async def _replace_services(db, device_id: str, services: list[DeviceService], now: str) -> None:
+async def _replace_services(
+    db, device_id: str, services: list[DeviceService], now: str
+) -> None:
     """Wipe and re-insert the service set for one device."""
     await db.execute("DELETE FROM device_services WHERE device_id = ?", (device_id,))
     for s in services:
@@ -195,9 +230,7 @@ async def _load_services_for_device(db, device_id: str) -> list[DeviceService]:
 
 async def merge_unifi_topology(topology) -> list[Device]:
     """Upsert UniFi-managed devices. Returns updated list."""
-    from integrations.unifi import UniFiTopology, UniFiDevice, UniFiClient
 
-    updated: list[Device] = []
     now = datetime.now(timezone.utc).isoformat()
 
     async with get_db() as db:
@@ -211,16 +244,24 @@ async def merge_unifi_topology(topology) -> list[Device]:
             }
             meta_json = json.dumps(metadata)
 
-            row = await (await db.execute(
-                "SELECT id FROM devices WHERE id = ?", (device_id,)
-            )).fetchone()
+            row = await (
+                await db.execute("SELECT id FROM devices WHERE id = ?", (device_id,))
+            ).fetchone()
 
             if row:
                 await db.execute(
                     """UPDATE devices SET ip=?, mac=?, hostname=?, device_type=?,
                        confidence=1.0, metadata=?, is_online=1, last_seen=?
                        WHERE id=?""",
-                    (dev.ip, dev.mac, dev.name, dev.device_type, meta_json, now, device_id),
+                    (
+                        dev.ip,
+                        dev.mac,
+                        dev.name,
+                        dev.device_type,
+                        meta_json,
+                        now,
+                        device_id,
+                    ),
                 )
             else:
                 await db.execute(
@@ -228,16 +269,24 @@ async def merge_unifi_topology(topology) -> list[Device]:
                        (id, mac, ip, hostname, device_type, confidence, metadata,
                         is_online, first_seen, last_seen)
                        VALUES (?,?,?,?,?,1.0,?,1,?,?)""",
-                    (device_id, dev.mac, dev.ip, dev.name,
-                     dev.device_type, meta_json, now, now),
+                    (
+                        device_id,
+                        dev.mac,
+                        dev.ip,
+                        dev.name,
+                        dev.device_type,
+                        meta_json,
+                        now,
+                        now,
+                    ),
                 )
 
         # Mark UniFi clients as online
         for client in topology.clients:
             cid = _device_id_from_mac(client.mac, client.ip)
-            row = await (await db.execute(
-                "SELECT id FROM devices WHERE id = ?", (cid,)
-            )).fetchone()
+            row = await (
+                await db.execute("SELECT id FROM devices WHERE id = ?", (cid,))
+            ).fetchone()
             if row:
                 await db.execute(
                     "UPDATE devices SET ip=?, hostname=?, is_online=1, last_seen=? WHERE id=?",
@@ -333,15 +382,18 @@ async def merge_gateway_leases(
             continue
         # If we already have this MAC from a lease, only fill in
         # missing fields from ARP — never overwrite DHCP data.
-        slot = by_mac.setdefault(mac, {
-            "ip": getattr(entry, "ip", None),
-            "hostname": None,
-            "state": "",
-            "interface": getattr(entry, "interface", "") or "",
-            "interface_description": "",
-            "manufacturer": "",
-            "origin": "arp",
-        })
+        slot = by_mac.setdefault(
+            mac,
+            {
+                "ip": getattr(entry, "ip", None),
+                "hostname": None,
+                "state": "",
+                "interface": getattr(entry, "interface", "") or "",
+                "interface_description": "",
+                "manufacturer": "",
+                "origin": "arp",
+            },
+        )
         if not slot.get("ip"):
             slot["ip"] = getattr(entry, "ip", None)
         if not slot.get("hostname") and getattr(entry, "hostname", None):
@@ -354,10 +406,13 @@ async def merge_gateway_leases(
             device_id = _device_id_from_mac(mac, info.get("ip"))
 
             # Read existing row so we can honour the precedence rules.
-            row = await (await db.execute(
-                "SELECT id, hostname, device_type, confidence, metadata "
-                "FROM devices WHERE id = ?", (device_id,)
-            )).fetchone()
+            row = await (
+                await db.execute(
+                    "SELECT id, hostname, device_type, confidence, metadata "
+                    "FROM devices WHERE id = ?",
+                    (device_id,),
+                )
+            ).fetchone()
 
             # Merge metadata: keep whatever was there, add our chunk.
             existing_meta: dict = {}
@@ -367,14 +422,16 @@ async def merge_gateway_leases(
                 except Exception:
                     existing_meta = {}
             gw_meta = existing_meta.get(f"{source}_gateway", {})
-            gw_meta.update({
-                "source_label": source_label,
-                "interface": info["interface"],
-                "interface_description": info["interface_description"],
-                "manufacturer": info["manufacturer"],
-                "state": info["state"],
-                "origin": info["origin"],
-            })
+            gw_meta.update(
+                {
+                    "source_label": source_label,
+                    "interface": info["interface"],
+                    "interface_description": info["interface_description"],
+                    "manufacturer": info["manufacturer"],
+                    "state": info["state"],
+                    "origin": info["origin"],
+                }
+            )
             existing_meta[f"{source}_gateway"] = gw_meta
             # Provenance chips list: union of sources the device has
             # ever been seen from. Purely for the device-detail UI.
@@ -414,7 +471,15 @@ async def merge_gateway_leases(
                        (id, mac, ip, hostname, device_type, confidence, metadata,
                         is_online, first_seen, last_seen)
                        VALUES (?, ?, ?, ?, 'unknown', 0.2, ?, 1, ?, ?)""",
-                    (device_id, mac, info.get("ip"), hostname_to_write, meta_json, now, now),
+                    (
+                        device_id,
+                        mac,
+                        info.get("ip"),
+                        hostname_to_write,
+                        meta_json,
+                        now,
+                        now,
+                    ),
                 )
         await db.commit()
 
@@ -478,10 +543,13 @@ async def merge_firewalla_devices(
 
             device_id = _device_id_from_mac(mac, ip)
 
-            row = await (await db.execute(
-                "SELECT id, hostname, device_type, confidence, metadata "
-                "FROM devices WHERE id = ?", (device_id,)
-            )).fetchone()
+            row = await (
+                await db.execute(
+                    "SELECT id, hostname, device_type, confidence, metadata "
+                    "FROM devices WHERE id = ?",
+                    (device_id,),
+                )
+            ).fetchone()
 
             # Merge metadata under our own subkey.
             existing_meta: dict = {}
@@ -491,15 +559,17 @@ async def merge_firewalla_devices(
                 except Exception:
                     existing_meta = {}
             fw_meta = existing_meta.get(f"{source}_gateway", {})
-            fw_meta.update({
-                "source_label": source_label,
-                "gid": gid,
-                "vendor": vendor,
-                "network": network_name,
-                "group": group_name,
-                "firewalla_online": online,
-                "last_seen_ts": getattr(d, "last_seen", None),
-            })
+            fw_meta.update(
+                {
+                    "source_label": source_label,
+                    "gid": gid,
+                    "vendor": vendor,
+                    "network": network_name,
+                    "group": group_name,
+                    "firewalla_online": online,
+                    "last_seen_ts": getattr(d, "last_seen", None),
+                }
+            )
             existing_meta[f"{source}_gateway"] = fw_meta
             sources = set(existing_meta.get("seen_by", []))
             sources.add(source)
@@ -537,8 +607,14 @@ async def merge_firewalla_devices(
                         is_online, first_seen, last_seen)
                        VALUES (?, ?, ?, ?, 'unknown', 0.25, ?, ?, ?, ?)""",
                     (
-                        device_id, mac, ip, hostname_to_write, meta_json,
-                        1 if online else 0, now, now,
+                        device_id,
+                        mac,
+                        ip,
+                        hostname_to_write,
+                        meta_json,
+                        1 if online else 0,
+                        now,
+                        now,
                     ),
                 )
         await db.commit()
@@ -580,35 +656,40 @@ async def get_all_devices() -> list[Device]:
     devices = []
     for row in rows:
         meta = json.loads(row["metadata"] or "{}")
-        devices.append(Device(
-            id=row["id"],
-            mac=row["mac"],
-            ip=row["ip"],
-            hostname=row["hostname"],
-            label=row["label"],
-            device_type=row["device_type"] or "unknown",  # type: ignore[arg-type]
-            status="online" if row["is_online"] else "offline",
-            confidence=row["confidence"] or 0.0,
-            metadata=meta,
-            services=services_by_device.get(row["id"], []),
-            is_online=bool(row["is_online"]),
-            first_seen=datetime.fromisoformat(row["first_seen"]) if row["first_seen"] else None,
-            last_seen=datetime.fromisoformat(row["last_seen"]) if row["last_seen"] else None,
-            vuln_summary=VulnSummary(
-                critical=row["vcrit"] or 0,
-                high=row["vhigh"] or 0,
-                medium=row["vmed"] or 0,
-                low=row["vlow"] or 0,
-            ),
-        ))
+        devices.append(
+            Device(
+                id=row["id"],
+                mac=row["mac"],
+                ip=row["ip"],
+                hostname=row["hostname"],
+                label=row["label"],
+                device_type=row["device_type"] or "unknown",  # type: ignore[arg-type]
+                status="online" if row["is_online"] else "offline",
+                confidence=row["confidence"] or 0.0,
+                metadata=meta,
+                services=services_by_device.get(row["id"], []),
+                is_online=bool(row["is_online"]),
+                first_seen=datetime.fromisoformat(row["first_seen"])
+                if row["first_seen"]
+                else None,
+                last_seen=datetime.fromisoformat(row["last_seen"])
+                if row["last_seen"]
+                else None,
+                vuln_summary=VulnSummary(
+                    critical=row["vcrit"] or 0,
+                    high=row["vhigh"] or 0,
+                    medium=row["vmed"] or 0,
+                    low=row["vlow"] or 0,
+                ),
+            )
+        )
     return devices
 
 
 def detect_unknown_devices(devices: list[Device]) -> list[Device]:
     """Return devices that need Claude integration (unknown type, low confidence, has services)."""
     return [
-        d for d in devices
-        if d.device_type == "unknown"
-        and len(d.services) > 0
-        and d.confidence < 0.3
+        d
+        for d in devices
+        if d.device_type == "unknown" and len(d.services) > 0 and d.confidence < 0.3
     ]

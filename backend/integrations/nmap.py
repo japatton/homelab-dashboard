@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, field
 from typing import Optional
 
 from .base import BaseIntegration, ConnectionResult
@@ -12,9 +11,9 @@ from models.scan import NmapHost, NmapPort, NmapResult
 log = logging.getLogger(__name__)
 
 SCAN_PROFILES = {
-    "quick":    ["-T4", "-F", "--open"],
+    "quick": ["-T4", "-F", "--open"],
     "standard": ["-T4", "-sV", "--open", "--version-intensity", "3"],
-    "full":     ["-T4", "-sV", "-sC", "--open", "--version-intensity", "5"],
+    "full": ["-T4", "-sV", "-sC", "--open", "--version-intensity", "5"],
 }
 
 
@@ -24,7 +23,8 @@ class NmapIntegration(BaseIntegration):
     async def test_connection(self) -> ConnectionResult:
         try:
             proc = await asyncio.create_subprocess_exec(
-                "nmap", "--version",
+                "nmap",
+                "--version",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -43,7 +43,9 @@ class NmapIntegration(BaseIntegration):
         extra_args: Optional[list[str]] = None,
         timeout: int = 300,
     ) -> NmapResult:
-        args = ["nmap", "-oX", "-"] + SCAN_PROFILES.get(profile, SCAN_PROFILES["standard"])
+        args = ["nmap", "-oX", "-"] + SCAN_PROFILES.get(
+            profile, SCAN_PROFILES["standard"]
+        )
         if extra_args:
             args.extend(extra_args)
         args.extend(targets)
@@ -118,31 +120,44 @@ def _parse_xml(xml_text: str, command: str) -> NmapResult:
         if ports_el is not None:
             for port_el in ports_el.findall("port"):
                 state_el = port_el.find("state")
-                if state_el is None or state_el.get("state") not in ("open", "open|filtered"):
+                if state_el is None or state_el.get("state") not in (
+                    "open",
+                    "open|filtered",
+                ):
                     continue
                 service_el = port_el.find("service")
-                ports.append(NmapPort(
-                    port=int(port_el.get("portid", "0")),
-                    protocol=port_el.get("protocol", "tcp"),
-                    state=state_el.get("state", "open"),
-                    service=service_el.get("name", "") if service_el is not None else "",
-                    version=_version_string(service_el) if service_el is not None else "",
-                    product=service_el.get("product", "") if service_el is not None else "",
-                ))
+                ports.append(
+                    NmapPort(
+                        port=int(port_el.get("portid", "0")),
+                        protocol=port_el.get("protocol", "tcp"),
+                        state=state_el.get("state", "open"),
+                        service=service_el.get("name", "")
+                        if service_el is not None
+                        else "",
+                        version=_version_string(service_el)
+                        if service_el is not None
+                        else "",
+                        product=service_el.get("product", "")
+                        if service_el is not None
+                        else "",
+                    )
+                )
 
         os_guess = None
         os_el = host_el.find("os/osmatch")
         if os_el is not None:
             os_guess = os_el.get("name")
 
-        hosts.append(NmapHost(
-            ip=ip,
-            mac=mac,
-            hostname=hostname,
-            status="up",
-            ports=ports,
-            os_guess=os_guess,
-        ))
+        hosts.append(
+            NmapHost(
+                ip=ip,
+                mac=mac,
+                hostname=hostname,
+                status="up",
+                ports=ports,
+                os_guess=os_guess,
+            )
+        )
 
     return NmapResult(hosts=hosts, scan_duration_seconds=elapsed, command=command)
 

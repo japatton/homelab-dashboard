@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -11,9 +9,9 @@ from .base import BaseIntegration, ConnectionResult
 log = logging.getLogger(__name__)
 
 # Index names
-IDX_DEVICES  = "homelab-devices"
-IDX_SCANS    = "homelab-scans"
-IDX_VULNS    = "homelab-vulns"
+IDX_DEVICES = "homelab-devices"
+IDX_SCANS = "homelab-scans"
+IDX_VULNS = "homelab-vulns"
 
 INDEX_TEMPLATES = {
     IDX_DEVICES: {
@@ -66,6 +64,7 @@ class ElasticsearchClient(BaseIntegration):
             return self._es
         try:
             from elasticsearch import AsyncElasticsearch
+
             kwargs: dict = {"hosts": [f"http://{self._host}:{self._port}"]}
             if self._user:
                 kwargs["basic_auth"] = (self._user, self._password)
@@ -108,7 +107,9 @@ class ElasticsearchClient(BaseIntegration):
         except Exception as e:
             log.warning("ES device store failed: %s", self._safe_error(e))
 
-    async def store_scan_result(self, scan_id: str, scan_type: str, device_id: str, summary: dict) -> None:
+    async def store_scan_result(
+        self, scan_id: str, scan_type: str, device_id: str, summary: dict
+    ) -> None:
         es = self._get_client()
         if es is None:
             return

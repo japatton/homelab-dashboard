@@ -20,6 +20,7 @@ NOTE: This is intentionally a single shared token, not per-user auth.
 The threat model is "gate the dashboard from drive-by access", not
 multi-tenant. Bump to OIDC/oauth2 if you ever have multiple users.
 """
+
 from __future__ import annotations
 
 import hmac
@@ -44,13 +45,9 @@ class DashboardTokenMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._token = token or None
         if self._token:
-            log.info(
-                "Dashboard token auth ENABLED — /api/* requires Bearer token"
-            )
+            log.info("Dashboard token auth ENABLED — /api/* requires Bearer token")
         else:
-            log.info(
-                "Dashboard token auth DISABLED — set DASHBOARD_TOKEN to turn on"
-            )
+            log.info("Dashboard token auth DISABLED — set DASHBOARD_TOKEN to turn on")
 
     async def dispatch(self, request: Request, call_next):
         if not self._token:

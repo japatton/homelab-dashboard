@@ -4,7 +4,6 @@ from services.background_tasks import spawn
 import json
 import logging
 import os
-import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -72,9 +71,11 @@ async def _get_change(change_id: str) -> Optional[dict]:
     if _MOCK:
         return _staged.get(change_id)
     async with get_db() as db:
-        row = await (await db.execute(
-            "SELECT * FROM claude_staged_changes WHERE id = ?", (change_id,)
-        )).fetchone()
+        row = await (
+            await db.execute(
+                "SELECT * FROM claude_staged_changes WHERE id = ?", (change_id,)
+            )
+        ).fetchone()
     if row is None:
         return None
     d = dict(row)
@@ -85,15 +86,18 @@ async def _get_change(change_id: str) -> Optional[dict]:
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @router.get("/staged")
 async def get_staged():
     if _MOCK:
         return [v for v in _staged.values() if v["status"] == "pending"]
 
     async with get_db() as db:
-        rows = await (await db.execute(
-            "SELECT * FROM claude_staged_changes WHERE status = 'pending' ORDER BY triggered_at DESC"
-        )).fetchall()
+        rows = await (
+            await db.execute(
+                "SELECT * FROM claude_staged_changes WHERE status = 'pending' ORDER BY triggered_at DESC"
+            )
+        ).fetchall()
 
     results = []
     for row in rows:
@@ -110,7 +114,9 @@ async def approve_change(change_id: str):
     if not change:
         raise HTTPException(status_code=404, detail="Staged change not found")
     if change["status"] != "pending":
-        raise HTTPException(status_code=400, detail=f"Change is already {change['status']}")
+        raise HTTPException(
+            status_code=400, detail=f"Change is already {change['status']}"
+        )
 
     now = datetime.now(timezone.utc).isoformat()
 
@@ -135,10 +141,14 @@ async def approve_change(change_id: str):
                 name=f"claude:apply:{change_id}",
             )
 
-    await _write_audit("approve_claude_change", "user", {
-        "change_id": change_id,
-        "device_id": change.get("device_id"),
-    })
+    await _write_audit(
+        "approve_claude_change",
+        "user",
+        {
+            "change_id": change_id,
+            "device_id": change.get("device_id"),
+        },
+    )
     return {"approved": change_id}
 
 
@@ -161,10 +171,14 @@ async def reject_change(change_id: str):
             )
             await db.commit()
 
-    await _write_audit("reject_claude_change", "user", {
-        "change_id": change_id,
-        "device_id": change.get("device_id"),
-    })
+    await _write_audit(
+        "reject_claude_change",
+        "user",
+        {
+            "change_id": change_id,
+            "device_id": change.get("device_id"),
+        },
+    )
     return {"rejected": change_id}
 
 
@@ -173,6 +187,7 @@ async def get_audit_log(limit: int = 50):
     # Delegated to services/audit_service so retention and JSON decoding stay
     # in one place. Endpoint path kept for frontend compatibility.
     from services.audit_service import list_audit
+
     return await list_audit(limit=limit)
 
 
@@ -183,9 +198,12 @@ async def get_change_history(limit: int = 50):
         return list(_staged.values())
 
     async with get_db() as db:
-        rows = await (await db.execute(
-            "SELECT * FROM claude_staged_changes ORDER BY triggered_at DESC LIMIT ?", (limit,)
-        )).fetchall()
+        rows = await (
+            await db.execute(
+                "SELECT * FROM claude_staged_changes ORDER BY triggered_at DESC LIMIT ?",
+                (limit,),
+            )
+        ).fetchall()
 
     results = []
     for row in rows:
@@ -196,25 +214,35 @@ async def get_change_history(limit: int = 50):
     return results
 
 
-async def _do_apply(change_id: str, sandbox_dir: str, generated_files: list[str], change: dict) -> None:
+async def _do_apply(
+    change_id: str, sandbox_dir: str, generated_files: list[str], change: dict
+) -> None:
     try:
         from services.claude_runner import apply_change
+
         copied = await apply_change(change_id, sandbox_dir, generated_files)
         log.info("Applied %d file(s) for change %s: %s", len(copied), change_id, copied)
 
-        await _write_audit("apply_claude_change", "system", {
-            "change_id": change_id,
-            "device_id": change.get("device_id"),
-            "files_applied": copied,
-        })
+        await _write_audit(
+            "apply_claude_change",
+            "system",
+            {
+                "change_id": change_id,
+                "device_id": change.get("device_id"),
+                "files_applied": copied,
+            },
+        )
 
         # Notify frontend
         from services.notification_service import get_notification_service
+
         ns = get_notification_service()
-        await ns.emit_claude_staged({
-            "id": change_id,
-            "status": "applied",
-            "files_applied": copied,
-        })
+        await ns.emit_claude_staged(
+            {
+                "id": change_id,
+                "status": "applied",
+                "files_applied": copied,
+            }
+        )
     except Exception as e:
         log.error("apply_change failed: %s", e)

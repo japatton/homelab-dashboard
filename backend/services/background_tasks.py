@@ -17,6 +17,7 @@ Usage:
 The return value is still the Task, so callers that *do* want to await it
 or cancel it can — the bookkeeping just makes it safe to ignore.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -39,7 +40,9 @@ def _on_done(task: asyncio.Task) -> None:
         # Use log.exception to get the traceback without re-raising — this
         # is fire-and-forget, there's nobody up the stack to catch it.
         log.error(
-            "Background task %r failed: %s", task.get_name(), exc,
+            "Background task %r failed: %s",
+            task.get_name(),
+            exc,
             exc_info=exc,
         )
 

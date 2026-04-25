@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Scan credentials store.
 
@@ -18,6 +16,8 @@ The returned dict always includes both pairs so callers (OpenVAS integration,
 SSH probe) can pick whichever auth_type a row is tagged with without having to
 reissue the query.
 """
+
+from __future__ import annotations
 
 import logging
 import uuid
@@ -50,15 +50,18 @@ async def get_scan_credential(device_ip: str) -> Optional[dict]:
     Falls back to the wildcard `*` row when no device-specific row exists.
     """
     from database import get_db
+
     async with get_db() as db:
-        row = await (await db.execute(
-            """SELECT id, target_ip, username, auth_type, password,
+        row = await (
+            await db.execute(
+                """SELECT id, target_ip, username, auth_type, password,
                       private_key, key_passphrase, note
                  FROM scan_credentials
                 WHERE target_ip = ? OR target_ip = '*'
                 ORDER BY target_ip DESC LIMIT 1""",
-            (device_ip,),
-        )).fetchone()
+                (device_ip,),
+            )
+        ).fetchone()
     return _row_to_cred(row) if row else None
 
 
@@ -66,22 +69,27 @@ async def list_scan_credentials() -> list[dict]:
     """List all stored credentials. Secret material is stripped — the UI only
     needs to know which rows exist and what auth type they use."""
     from database import get_db
+
     async with get_db() as db:
-        rows = await (await db.execute(
-            """SELECT id, target_ip, username, auth_type, note
+        rows = await (
+            await db.execute(
+                """SELECT id, target_ip, username, auth_type, note
                  FROM scan_credentials
                 ORDER BY target_ip"""
-        )).fetchall()
+            )
+        ).fetchall()
     out = []
     for r in rows:
         d = dict(r)
-        out.append({
-            "id": d["id"],
-            "target_ip": d["target_ip"],
-            "username": d["username"],
-            "auth_type": d.get("auth_type") or "password",
-            "note": d.get("note") or "",
-        })
+        out.append(
+            {
+                "id": d["id"],
+                "target_ip": d["target_ip"],
+                "username": d["username"],
+                "auth_type": d.get("auth_type") or "password",
+                "note": d.get("note") or "",
+            }
+        )
     return out
 
 
@@ -107,9 +115,11 @@ async def upsert_scan_credential(
 
     cred_id = str(uuid.uuid4())
     async with get_db() as db:
-        existing = await (await db.execute(
-            "SELECT id FROM scan_credentials WHERE target_ip = ?", (target_ip,)
-        )).fetchone()
+        existing = await (
+            await db.execute(
+                "SELECT id FROM scan_credentials WHERE target_ip = ?", (target_ip,)
+            )
+        ).fetchone()
         if existing:
             cred_id = existing["id"]
             await db.execute(
@@ -117,8 +127,15 @@ async def upsert_scan_credential(
                       SET username=?, auth_type=?, password=?, private_key=?,
                           key_passphrase=?, note=?
                     WHERE id=?""",
-                (username, auth_type, password, private_key,
-                 key_passphrase, note, cred_id),
+                (
+                    username,
+                    auth_type,
+                    password,
+                    private_key,
+                    key_passphrase,
+                    note,
+                    cred_id,
+                ),
             )
         else:
             await db.execute(
@@ -126,8 +143,16 @@ async def upsert_scan_credential(
                      (id, target_ip, username, auth_type, password,
                       private_key, key_passphrase, note)
                    VALUES (?,?,?,?,?,?,?,?)""",
-                (cred_id, target_ip, username, auth_type, password,
-                 private_key, key_passphrase, note),
+                (
+                    cred_id,
+                    target_ip,
+                    username,
+                    auth_type,
+                    password,
+                    private_key,
+                    key_passphrase,
+                    note,
+                ),
             )
         await db.commit()
     return cred_id
@@ -135,6 +160,7 @@ async def upsert_scan_credential(
 
 async def delete_scan_credential(cred_id: str) -> bool:
     from database import get_db
+
     async with get_db() as db:
         result = await db.execute(
             "DELETE FROM scan_credentials WHERE id = ?", (cred_id,)

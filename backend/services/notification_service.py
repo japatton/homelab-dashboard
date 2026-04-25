@@ -29,12 +29,15 @@ class NotificationService:
         self, job_id: str, scan_type: str, percent: int, message: str = ""
     ) -> None:
         if self._sio:
-            await self._sio.emit("scan:progress", {
-                "job_id": job_id,
-                "scan_type": scan_type,
-                "percent": percent,
-                "message": message,
-            })
+            await self._sio.emit(
+                "scan:progress",
+                {
+                    "job_id": job_id,
+                    "scan_type": scan_type,
+                    "percent": percent,
+                    "message": message,
+                },
+            )
 
     async def emit_scan_complete(
         self,
@@ -64,11 +67,15 @@ class NotificationService:
 
     async def emit_vuln_updated(self, device_id: str, summary: dict) -> None:
         if self._sio:
-            await self._sio.emit("vuln:updated", {"device_id": device_id, "summary": summary})
+            await self._sio.emit(
+                "vuln:updated", {"device_id": device_id, "summary": summary}
+            )
 
     async def emit_scheduler_tick(self, job_id: str, next_run: str) -> None:
         if self._sio:
-            await self._sio.emit("scheduler:tick", {"job_id": job_id, "next_run": next_run})
+            await self._sio.emit(
+                "scheduler:tick", {"job_id": job_id, "next_run": next_run}
+            )
 
     async def emit_alarm_new(self, alarm: dict, summary: dict) -> None:
         """Push a newly-created gateway alarm to all connected sockets.
@@ -89,7 +96,9 @@ class NotificationService:
         if self._sio:
             await self._sio.emit("alarm:summary", {"summary": summary})
 
-    async def emit_openvas_reset(self, stage: str, percent: int, message: str = "", error: Optional[str] = None) -> None:
+    async def emit_openvas_reset(
+        self, stage: str, percent: int, message: str = "", error: Optional[str] = None
+    ) -> None:
         """Progress for the "Reset OpenVAS Admin Password" flow.
 
         `stage` is a short machine-friendly slug ("stopping" / "wiping" /
@@ -97,12 +106,15 @@ class NotificationService:
         progress bar in the modal; `message` is the human-readable line.
         """
         if self._sio:
-            await self._sio.emit("openvas:reset", {
-                "stage": stage,
-                "percent": percent,
-                "message": message,
-                "error": error,
-            })
+            await self._sio.emit(
+                "openvas:reset",
+                {
+                    "stage": stage,
+                    "percent": percent,
+                    "message": message,
+                    "error": error,
+                },
+            )
 
 
 @functools.lru_cache(maxsize=1)

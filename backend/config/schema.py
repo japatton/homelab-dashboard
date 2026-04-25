@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Literal, Optional
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from typing import Literal
+from pydantic import BaseModel, Field, SecretStr
 
 
 class UniFiConfig(BaseModel):
@@ -55,6 +55,7 @@ class OPNsenseConfig(BaseModel):
     `ids_enabled` toggles whether the poller queries Suricata alerts
     (extra endpoint, ignorable when the IDS isn't running).
     """
+
     enabled: bool = False
     url: str = ""
     api_key: str = ""
@@ -94,6 +95,7 @@ class FirewallaConfig(BaseModel):
     scheme and /v2/ prefix are added by the client.
     `local_url` is the full base URL (http://<box_ip>:8833).
     """
+
     enabled: bool = False
     mode: Literal["msp", "local"] = "msp"
     # MSP-mode fields
@@ -176,6 +178,7 @@ class OllamaConfig(BaseModel):
     :11434/v1 for direct Ollama or OpenWebUI's configured port.
     Leave api_key blank for vanilla Ollama; OpenWebUI may require one.
     """
+
     enabled: bool = False
     host: str = ""
     port: int = 11434

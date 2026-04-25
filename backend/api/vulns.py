@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os
-import uuid
-from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Body, HTTPException, Query
@@ -16,74 +14,130 @@ _MOCK = os.getenv("BACKEND_MOCK", "false").lower() == "true"
 
 _MOCK_VULNS = [
     {
-        "id": "vuln-001", "device_id": "dev-server-01", "device_ip": "192.168.1.50",
-        "device_hostname": "homelab-server", "device_label": "Homelab Server",
-        "cve_id": "CVE-2023-44487", "severity": "high", "score": 7.5,
+        "id": "vuln-001",
+        "device_id": "dev-server-01",
+        "device_ip": "192.168.1.50",
+        "device_hostname": "homelab-server",
+        "device_label": "Homelab Server",
+        "cve_id": "CVE-2023-44487",
+        "severity": "high",
+        "score": 7.5,
         "name": "HTTP/2 Rapid Reset Attack",
         "description": "The HTTP/2 protocol allows a denial of service (server resource consumption) because request cancellation can reset many streams quickly.",
         "solution": "Update to a patched version of your HTTP server software.",
-        "port": 443, "protocol": "tcp", "cve_ids": '["CVE-2023-44487"]',
-        "scan_job_id": "mock-job-01", "detected_at": "2026-04-17T04:00:00Z",
+        "port": 443,
+        "protocol": "tcp",
+        "cve_ids": '["CVE-2023-44487"]',
+        "scan_job_id": "mock-job-01",
+        "detected_at": "2026-04-17T04:00:00Z",
     },
     {
-        "id": "vuln-002", "device_id": "dev-server-01", "device_ip": "192.168.1.50",
-        "device_hostname": "homelab-server", "device_label": "Homelab Server",
-        "cve_id": "CVE-2023-2650", "severity": "high", "score": 7.5,
+        "id": "vuln-002",
+        "device_id": "dev-server-01",
+        "device_ip": "192.168.1.50",
+        "device_hostname": "homelab-server",
+        "device_label": "Homelab Server",
+        "cve_id": "CVE-2023-2650",
+        "severity": "high",
+        "score": 7.5,
         "name": "OpenSSL Excessive Resource Usage in X.509 Policy Constraints",
         "description": "Processing some specially crafted ASN.1 object identifiers or data containing them may be very slow.",
         "solution": "Update OpenSSL to version 3.0.9, 1.1.1u or later.",
-        "port": 443, "protocol": "tcp", "cve_ids": '["CVE-2023-2650"]',
-        "scan_job_id": "mock-job-01", "detected_at": "2026-04-17T04:00:00Z",
+        "port": 443,
+        "protocol": "tcp",
+        "cve_ids": '["CVE-2023-2650"]',
+        "scan_job_id": "mock-job-01",
+        "detected_at": "2026-04-17T04:00:00Z",
     },
     {
-        "id": "vuln-003", "device_id": "dev-truenas-01", "device_ip": "192.168.1.60",
-        "device_hostname": "truenas", "device_label": "TrueNAS",
-        "cve_id": "CVE-2022-45143", "severity": "critical", "score": 9.1,
+        "id": "vuln-003",
+        "device_id": "dev-truenas-01",
+        "device_ip": "192.168.1.60",
+        "device_hostname": "truenas",
+        "device_label": "TrueNAS",
+        "cve_id": "CVE-2022-45143",
+        "severity": "critical",
+        "score": 9.1,
         "name": "Apache Tomcat HTTP Request Smuggling",
         "description": "Apache Tomcat ignored the HTTP method when determining whether to send a 204 response, potentially allowing request smuggling attacks.",
         "solution": "Upgrade Apache Tomcat to 10.1.2, 9.0.69 or 8.5.83.",
-        "port": 80, "protocol": "tcp", "cve_ids": '["CVE-2022-45143"]',
-        "scan_job_id": "mock-job-01", "detected_at": "2026-04-17T04:00:00Z",
+        "port": 80,
+        "protocol": "tcp",
+        "cve_ids": '["CVE-2022-45143"]',
+        "scan_job_id": "mock-job-01",
+        "detected_at": "2026-04-17T04:00:00Z",
     },
     {
-        "id": "vuln-004", "device_id": "dev-truenas-01", "device_ip": "192.168.1.60",
-        "device_hostname": "truenas", "device_label": "TrueNAS",
-        "cve_id": "CVE-2023-0215", "severity": "medium", "score": 5.9,
+        "id": "vuln-004",
+        "device_id": "dev-truenas-01",
+        "device_ip": "192.168.1.60",
+        "device_hostname": "truenas",
+        "device_label": "TrueNAS",
+        "cve_id": "CVE-2023-0215",
+        "severity": "medium",
+        "score": 5.9,
         "name": "OpenSSL USE-after-free following BIO_new_NDEF",
         "description": "The public API function BIO_new_NDEF is a helper function used for streaming ASN.1 data via a BIO.",
         "solution": "Update OpenSSL to version 3.0.8, 1.1.1t or later.",
-        "port": 443, "protocol": "tcp", "cve_ids": '["CVE-2023-0215"]',
-        "scan_job_id": "mock-job-01", "detected_at": "2026-04-17T04:00:00Z",
+        "port": 443,
+        "protocol": "tcp",
+        "cve_ids": '["CVE-2023-0215"]',
+        "scan_job_id": "mock-job-01",
+        "detected_at": "2026-04-17T04:00:00Z",
     },
     {
-        "id": "vuln-005", "device_id": "dev-unknown-01", "device_ip": "192.168.1.200",
-        "device_hostname": None, "device_label": None,
-        "cve_id": "CVE-2021-44228", "severity": "critical", "score": 10.0,
+        "id": "vuln-005",
+        "device_id": "dev-unknown-01",
+        "device_ip": "192.168.1.200",
+        "device_hostname": None,
+        "device_label": None,
+        "cve_id": "CVE-2021-44228",
+        "severity": "critical",
+        "score": 10.0,
         "name": "Apache Log4j2 Remote Code Execution (Log4Shell)",
         "description": "Apache Log4j2 2.0-beta9 through 2.15.0 (excluding security releases) JNDI features do not protect against attacker controlled LDAP and other JNDI related endpoints.",
         "solution": "Update Log4j2 to version 2.17.1 (Java 8), 2.12.4 (Java 7) or 2.3.2 (Java 6).",
-        "port": 8443, "protocol": "tcp", "cve_ids": '["CVE-2021-44228"]',
-        "scan_job_id": "mock-job-01", "detected_at": "2026-04-17T04:01:00Z",
+        "port": 8443,
+        "protocol": "tcp",
+        "cve_ids": '["CVE-2021-44228"]',
+        "scan_job_id": "mock-job-01",
+        "detected_at": "2026-04-17T04:01:00Z",
     },
     {
-        "id": "vuln-006", "device_id": "dev-unknown-01", "device_ip": "192.168.1.200",
-        "device_hostname": None, "device_label": None,
-        "cve_id": "CVE-2021-45046", "severity": "critical", "score": 9.0,
+        "id": "vuln-006",
+        "device_id": "dev-unknown-01",
+        "device_ip": "192.168.1.200",
+        "device_hostname": None,
+        "device_label": None,
+        "cve_id": "CVE-2021-45046",
+        "severity": "critical",
+        "score": 9.0,
         "name": "Apache Log4j2 Context Lookup JNDI Injection",
         "description": "Thread Context Message Pattern and Context Lookup Pattern vulnerable to partial execution of arbitrary code.",
         "solution": "Update Log4j2 to version 2.16.0 or later.",
-        "port": 9000, "protocol": "tcp", "cve_ids": '["CVE-2021-45046"]',
-        "scan_job_id": "mock-job-01", "detected_at": "2026-04-17T04:01:00Z",
+        "port": 9000,
+        "protocol": "tcp",
+        "cve_ids": '["CVE-2021-45046"]',
+        "scan_job_id": "mock-job-01",
+        "detected_at": "2026-04-17T04:01:00Z",
     },
     {
-        "id": "vuln-007", "device_id": "dev-server-01", "device_ip": "192.168.1.50",
-        "device_hostname": "homelab-server", "device_label": "Homelab Server",
-        "cve_id": None, "severity": "low", "score": 2.0,
+        "id": "vuln-007",
+        "device_id": "dev-server-01",
+        "device_ip": "192.168.1.50",
+        "device_hostname": "homelab-server",
+        "device_label": "Homelab Server",
+        "cve_id": None,
+        "severity": "low",
+        "score": 2.0,
         "name": "SSL/TLS Certificate Signed Using Weak Hash Algorithm",
         "description": "The SSL/TLS certificate is signed using a deprecated weak hashing algorithm.",
         "solution": "Reissue the certificate using a strong algorithm such as SHA-256.",
-        "port": 443, "protocol": "tcp", "cve_ids": '[]',
-        "scan_job_id": "mock-job-01", "detected_at": "2026-04-17T04:00:00Z",
+        "port": 443,
+        "protocol": "tcp",
+        "cve_ids": "[]",
+        "scan_job_id": "mock-job-01",
+        "detected_at": "2026-04-17T04:00:00Z",
     },
 ]
 
@@ -99,6 +153,7 @@ def _filter_mock(severity: Optional[str], device_id: Optional[str]) -> list[dict
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @router.get("")
 async def list_vulns(
     severity: Optional[str] = None,
@@ -108,10 +163,13 @@ async def list_vulns(
 ):
     if _MOCK:
         data = _filter_mock(severity, device_id)
-        return data[offset: offset + limit]
+        return data[offset : offset + limit]
 
     from services.vuln_service import get_all_vulns
-    return await get_all_vulns(severity=severity, device_id=device_id, limit=limit, offset=offset)
+
+    return await get_all_vulns(
+        severity=severity, device_id=device_id, limit=limit, offset=offset
+    )
 
 
 @router.get("/stats")
@@ -126,6 +184,7 @@ async def vuln_stats():
             "low": sum(1 for v in _MOCK_VULNS if v["severity"] == "low"),
         }
     from services.vuln_service import get_vuln_stats
+
     return await get_vuln_stats()
 
 
@@ -134,6 +193,7 @@ async def device_vulns(device_id: str):
     if _MOCK:
         return _filter_mock(None, device_id)
     from services.vuln_service import get_device_vulns
+
     return await get_device_vulns(device_id)
 
 
@@ -143,19 +203,22 @@ async def trigger_device_scan(device_id: str):
         return {"triggered": device_id, "mock": True}
 
     from database import get_db
+
     async with get_db() as db:
-        row = await (await db.execute(
-            "SELECT ip FROM devices WHERE id = ?", (device_id,)
-        )).fetchone()
+        row = await (
+            await db.execute("SELECT ip FROM devices WHERE id = ?", (device_id,))
+        ).fetchone()
     if not row or not row["ip"]:
         raise HTTPException(status_code=404, detail="Device not found or has no IP")
 
     from services.audit_service import write_audit
     from services.vuln_service import run_openvas_scan
     from services.background_tasks import spawn
+
     spawn(run_openvas_scan(device_id, row["ip"]), name=f"scan:openvas:{device_id}")
     await write_audit(
-        "trigger_openvas_scan", "user",
+        "trigger_openvas_scan",
+        "user",
         {"device_id": device_id, "ip": row["ip"]},
     )
     return {"triggered": device_id, "ip": row["ip"]}
@@ -163,11 +226,13 @@ async def trigger_device_scan(device_id: str):
 
 # ── Scan credentials ──────────────────────────────────────────────────────────
 
+
 @router.get("/credentials")
 async def list_credentials():
     if _MOCK:
         return []
     from integrations.credentials import list_scan_credentials
+
     return await list_scan_credentials()
 
 
@@ -189,12 +254,15 @@ async def add_credential(
     if auth_type not in ("password", "key"):
         raise HTTPException(status_code=400, detail=f"invalid auth_type {auth_type!r}")
     if auth_type == "password" and not password:
-        raise HTTPException(status_code=400, detail="password required for password auth")
+        raise HTTPException(
+            status_code=400, detail="password required for password auth"
+        )
     if auth_type == "key" and not private_key:
         raise HTTPException(status_code=400, detail="private_key required for key auth")
 
     cred_id = await upsert_scan_credential(
-        target_ip, username,
+        target_ip,
+        username,
         auth_type=auth_type,
         password=password,
         private_key=private_key,
@@ -202,8 +270,14 @@ async def add_credential(
         note=note,
     )
     await write_audit(
-        "save_scan_credential", "user",
-        {"id": cred_id, "target_ip": target_ip, "username": username, "auth_type": auth_type},
+        "save_scan_credential",
+        "user",
+        {
+            "id": cred_id,
+            "target_ip": target_ip,
+            "username": username,
+            "auth_type": auth_type,
+        },
     )
     return {"id": cred_id, "target_ip": target_ip}
 
@@ -240,7 +314,9 @@ async def test_credential(
     if auth_type not in ("password", "key"):
         raise HTTPException(status_code=400, detail=f"invalid auth_type {auth_type!r}")
     if auth_type == "password" and not password:
-        raise HTTPException(status_code=400, detail="password required for password auth")
+        raise HTTPException(
+            status_code=400, detail="password required for password auth"
+        )
     if auth_type == "key" and not private_key:
         raise HTTPException(status_code=400, detail="private_key required for key auth")
 
@@ -250,7 +326,8 @@ async def test_credential(
         raise HTTPException(status_code=400, detail=str(e))
 
     results = await probe_many(
-        ips, username,
+        ips,
+        username,
         password=password or None,
         private_key=private_key or None,
         key_passphrase=key_passphrase or None,
@@ -272,8 +349,10 @@ async def test_credential(
     # when "check logs" is the user-facing error. 100-entry retention would
     # otherwise chew through the cap on a single /24 test.
     await write_audit(
-        "test_scan_credential", "user",
-        {k: v for k, v in summary.items() if k != "results"} | {
+        "test_scan_credential",
+        "user",
+        {k: v for k, v in summary.items() if k != "results"}
+        | {
             # Keep the per-host list, but cap what we store so a /29 doesn't
             # hide every other audit row off-screen.
             "results": per_host[:32],

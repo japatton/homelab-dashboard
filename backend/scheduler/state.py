@@ -24,9 +24,11 @@ async def record_job_run(job_id: str, status: str, detail: str = "") -> None:
 
 async def get_job_state(job_id: str) -> Optional[dict]:
     async with get_db() as db:
-        row = await (await db.execute(
-            "SELECT * FROM scheduler_state WHERE job_id = ?", (job_id,)
-        )).fetchone()
+        row = await (
+            await db.execute(
+                "SELECT * FROM scheduler_state WHERE job_id = ?", (job_id,)
+            )
+        ).fetchone()
     if row is None:
         return None
     return dict(row)
@@ -34,7 +36,7 @@ async def get_job_state(job_id: str) -> Optional[dict]:
 
 async def get_all_job_states() -> list[dict]:
     async with get_db() as db:
-        rows = await (await db.execute(
-            "SELECT * FROM scheduler_state ORDER BY last_run DESC"
-        )).fetchall()
+        rows = await (
+            await db.execute("SELECT * FROM scheduler_state ORDER BY last_run DESC")
+        ).fetchall()
     return [dict(r) for r in rows]

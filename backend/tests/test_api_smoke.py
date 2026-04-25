@@ -12,9 +12,8 @@ hit the endpoints we care about the most:
 These are not end-to-end tests. They verify HTTP wiring (routers
 mounted, middleware order correct, response shapes match).
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 
 class TestHealth:
@@ -45,15 +44,31 @@ class TestAlarms:
         # First row shape spot-check — the fields the Security page
         # renders and the socket event reuses.
         a = body["alarms"][0]
-        for key in ("id", "source", "severity", "message", "fingerprint",
-                    "first_seen_at", "last_seen_at", "count"):
+        for key in (
+            "id",
+            "source",
+            "severity",
+            "message",
+            "fingerprint",
+            "first_seen_at",
+            "last_seen_at",
+            "count",
+        ):
             assert key in a, f"missing {key} from alarm payload"
 
     def test_summary_shape(self, api_client):
         r = api_client.get("/api/alarms/summary")
         assert r.status_code == 200
         body = r.json()
-        for key in ("total", "unacknowledged", "critical", "high", "medium", "low", "info"):
+        for key in (
+            "total",
+            "unacknowledged",
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "info",
+        ):
             assert key in body, f"missing {key} from summary payload"
             assert isinstance(body[key], int)
 

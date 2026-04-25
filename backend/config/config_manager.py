@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import os
-import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -10,13 +9,7 @@ import yaml
 from pydantic import SecretStr
 
 from .schema import (
-    ClaudeConfig,
     ConfigRoot,
-    ElasticsearchConfig,
-    OpenVASConfig,
-    ProxyConfig,
-    SchedulerConfig,
-    UniFiConfig,
 )
 
 CONFIG_PATH = Path(os.getenv("CONFIG_PATH", "/data/config.yml"))
@@ -72,11 +65,17 @@ def _load_from_env(config: ConfigRoot) -> ConfigRoot:
         config.claude.enabled = _env("CLAUDE_ENABLED", "false").lower() == "true"
 
     if _env("NMAP_INTERVAL_MINUTES"):
-        config.scheduler.nmap_interval_minutes = int(_env("NMAP_INTERVAL_MINUTES", "15"))
+        config.scheduler.nmap_interval_minutes = int(
+            _env("NMAP_INTERVAL_MINUTES", "15")
+        )
     if _env("UNIFI_POLL_INTERVAL_SECONDS"):
-        config.scheduler.unifi_poll_interval_seconds = int(_env("UNIFI_POLL_INTERVAL_SECONDS", "30"))
+        config.scheduler.unifi_poll_interval_seconds = int(
+            _env("UNIFI_POLL_INTERVAL_SECONDS", "30")
+        )
     if _env("OPENVAS_INTERVAL_HOURS"):
-        config.scheduler.openvas_interval_hours = int(_env("OPENVAS_INTERVAL_HOURS", "24"))
+        config.scheduler.openvas_interval_hours = int(
+            _env("OPENVAS_INTERVAL_HOURS", "24")
+        )
 
     return config
 

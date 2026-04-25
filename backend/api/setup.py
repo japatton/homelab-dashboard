@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os as _os
 
 from fastapi import APIRouter, Body, HTTPException
 from pydantic import SecretStr
@@ -10,8 +11,6 @@ from config import get_config_manager
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 
-
-import os as _os
 _MOCK = _os.getenv("BACKEND_MOCK", "false").lower() == "true"
 
 
@@ -34,13 +33,19 @@ async def test_elasticsearch(
         raise HTTPException(status_code=400, detail="Host is required")
     try:
         import httpx
+
         auth = (user, password) if user else None
         async with httpx.AsyncClient(timeout=5.0) as c:
             r = await c.get(f"http://{host}:{port}", auth=auth)  # type: ignore[arg-type]
             if r.status_code < 500:
                 info = r.json()
-                return {"ok": True, "version": info.get("version", {}).get("number", "unknown")}
-        raise HTTPException(status_code=400, detail=f"Unexpected status {r.status_code}")
+                return {
+                    "ok": True,
+                    "version": info.get("version", {}).get("number", "unknown"),
+                }
+        raise HTTPException(
+            status_code=400, detail=f"Unexpected status {r.status_code}"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -58,7 +63,10 @@ async def test_unifi(
     """
     try:
         import httpx
-        async with httpx.AsyncClient(verify=False, follow_redirects=True, timeout=8.0) as c:
+
+        async with httpx.AsyncClient(
+            verify=False, follow_redirects=True, timeout=8.0
+        ) as c:
             controller_type: str | None = None
             # Try UDM / UDM Pro first
             r = await c.post(
@@ -333,6 +341,7 @@ async def test_ollama(
 @router.post("/complete")
 async def complete_setup(payload: dict = Body(...)):
     from services.audit_service import write_audit
+
     try:
         mgr = get_config_manager()
         cfg = mgr.get()
@@ -342,7 +351,9 @@ async def complete_setup(payload: dict = Body(...)):
             cfg.proxy.mode = p.get("mode", cfg.proxy.mode)  # type: ignore[assignment]
             cfg.proxy.external_host = p.get("external_host", cfg.proxy.external_host)
             cfg.proxy.cert_type = p.get("cert_type", cfg.proxy.cert_type)  # type: ignore[assignment]
-            cfg.proxy.letsencrypt_email = p.get("letsencrypt_email", cfg.proxy.letsencrypt_email)
+            cfg.proxy.letsencrypt_email = p.get(
+                "letsencrypt_email", cfg.proxy.letsencrypt_email
+            )
 
         if "elasticsearch" in payload:
             e = payload["elasticsearch"]
@@ -400,7 +411,9 @@ async def complete_setup(payload: dict = Body(...)):
                 cfg.firewalla.alarms_enabled = bool(f["alarms_enabled"])
             if "poll_interval_seconds" in f:
                 try:
-                    cfg.firewalla.poll_interval_seconds = int(f["poll_interval_seconds"])
+                    cfg.firewalla.poll_interval_seconds = int(
+                        f["poll_interval_seconds"]
+                    )
                 except (TypeError, ValueError):
                     pass
 
@@ -442,16 +455,34 @@ async def complete_setup(payload: dict = Body(...)):
         # Audit summary: record which sections were touched + their
         # non-secret values. Secrets (passwords / api_key) never hit the log.
         sections: dict = {}
-        for key in ("proxy", "elasticsearch", "unifi", "opnsense", "firewalla", "openvas", "claude", "ollama"):
+        for key in (
+            "proxy",
+            "elasticsearch",
+            "unifi",
+            "opnsense",
+            "firewalla",
+            "openvas",
+            "claude",
+            "ollama",
+        ):
             if key in payload:
                 sections[key] = {
-                    k: v for k, v in payload[key].items()
+                    k: v
+                    for k, v in payload[key].items()
                     # Strip every secret-ish key across all section types.
-                    if k not in ("password", "api_key", "api_secret", "msp_token", "local_token")
+                    if k
+                    not in (
+                        "password",
+                        "api_key",
+                        "api_secret",
+                        "msp_token",
+                        "local_token",
+                    )
                 }
         if sections:
             await write_audit(
-                "save_settings", "user",
+                "save_settings",
+                "user",
                 {"sections": list(sections.keys()), "values": sections},
             )
 
@@ -465,6 +496,7 @@ async def complete_setup(payload: dict = Body(...)):
         if "openvas" in payload and not cfg.openvas.password.get_secret_value():
             from services.background_tasks import spawn
             from services.openvas_autopassword import ensure_openvas_password
+
             spawn(ensure_openvas_password(), name="openvas:auto-init")
 
         return {"setup_complete": True}

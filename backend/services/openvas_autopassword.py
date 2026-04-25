@@ -28,6 +28,7 @@ shell-dangerous bytes (quotes, backslashes, $, `, ;) because the password
 is passed through docker's `environment=` list and eventually through
 bcrypt. URL-safe base64 would work too but is less readable in logs.
 """
+
 from __future__ import annotations
 
 import logging
@@ -105,4 +106,5 @@ async def _run_reset(new_password: str, username: str) -> None:
     docker/gvmd dance. Keeps `openvas_reset.py` as the single source
     of truth for how the container is recreated."""
     from services.openvas_reset import reset_openvas_password
+
     await reset_openvas_password(new_password, username)

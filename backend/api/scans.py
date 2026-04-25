@@ -33,7 +33,9 @@ async def _run_nmap(job: ScanJob, targets: list[str], profile: str) -> None:
         nmap = NmapIntegration()
         result = await nmap.scan(targets, profile=profile)
 
-        await ns.emit_scan_progress(job.id, "nmap", 65, f"Discovered {len(result.hosts)} hosts")
+        await ns.emit_scan_progress(
+            job.id, "nmap", 65, f"Discovered {len(result.hosts)} hosts"
+        )
         devices = await merge_nmap_result(result)
 
         await ns.emit_scan_progress(job.id, "nmap", 85, "Refreshing topology")
@@ -85,6 +87,7 @@ async def trigger_nmap(
 
     scan_targets = targets or ["192.168.0.0/24"]
     from services.background_tasks import spawn
+
     spawn(_run_nmap(job, scan_targets, profile), name=f"scan:nmap:{job.id}")
     return job
 

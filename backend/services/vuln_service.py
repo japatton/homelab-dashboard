@@ -57,7 +57,9 @@ async def run_openvas_scan(device_id: str, ip: str) -> int:
         # scanner ran and covered this host).
         await _ship_scan_summary_to_es(device_id, ip, len(raw_findings))
 
-        count = await _store_findings(device_id, ip, raw_findings) if raw_findings else 0
+        count = (
+            await _store_findings(device_id, ip, raw_findings) if raw_findings else 0
+        )
         if count:
             log.info("Stored %d vulns for %s (%s)", count, ip, device_id)
 
@@ -88,6 +90,7 @@ async def _ship_scan_summary_to_es(device_id: str, ip: str, finding_count: int) 
     """Post a single 'homelab-scans' doc summarising this OpenVAS run."""
     try:
         from integrations.elasticsearch_client import get_es_client
+
         es = get_es_client()
         if es is None:
             return
@@ -121,6 +124,7 @@ async def _store_findings(device_id: str, ip: str, findings: list[dict]) -> int:
 
     # Elasticsearch shipping (best-effort; never blocks SQLite writes)
     from integrations.elasticsearch_client import get_es_client
+
     es = get_es_client()
 
     # Build parameter rows + ES docs up front, then issue ONE executemany
@@ -140,36 +144,41 @@ async def _store_findings(device_id: str, ip: str, findings: list[dict]) -> int:
         port = f.get("port") if f.get("port") is not None else 0
         protocol = f.get("protocol") or "tcp"
 
-        rows.append((
-            vid, device_id,
-            primary_cve,
-            f["severity"],
-            f["score"],
-            f.get("description", ""),
-            f.get("solution", ""),
-            scan_job_id,
-            now,   # first_seen (kept only if this is a new row)
-            now,   # detected_at
-            name,
-            port,
-            protocol,
-            cve_ids,
-        ))
-        es_docs.append({
-            "id": vid,
-            "device_id": device_id,
-            "device_ip": ip,
-            "scan_job_id": scan_job_id,
-            "cve_id": primary_cve,
-            "cve_ids": cve_list,
-            "name": name,
-            "severity": f["severity"],
-            "score": f["score"],
-            "port": port,
-            "protocol": protocol,
-            "description": (f.get("description") or "")[:2000],
-            "solution": (f.get("solution") or "")[:1000],
-        })
+        rows.append(
+            (
+                vid,
+                device_id,
+                primary_cve,
+                f["severity"],
+                f["score"],
+                f.get("description", ""),
+                f.get("solution", ""),
+                scan_job_id,
+                now,  # first_seen (kept only if this is a new row)
+                now,  # detected_at
+                name,
+                port,
+                protocol,
+                cve_ids,
+            )
+        )
+        es_docs.append(
+            {
+                "id": vid,
+                "device_id": device_id,
+                "device_ip": ip,
+                "scan_job_id": scan_job_id,
+                "cve_id": primary_cve,
+                "cve_ids": cve_list,
+                "name": name,
+                "severity": f["severity"],
+                "score": f["score"],
+                "port": port,
+                "protocol": protocol,
+                "description": (f.get("description") or "")[:2000],
+                "solution": (f.get("solution") or "")[:1000],
+            }
+        )
 
     async with get_db() as db:
         if rows:
@@ -205,7 +214,8 @@ async def _store_findings(device_id: str, ip: str, findings: list[dict]) -> int:
             except Exception as e:
                 log.debug(
                     "ES vuln ship failed for %s (non-fatal): %s",
-                    doc.get("cve_id") or doc.get("name"), e,
+                    doc.get("cve_id") or doc.get("name"),
+                    e,
                 )
 
     return stored
@@ -213,11 +223,13 @@ async def _store_findings(device_id: str, ip: str, findings: list[dict]) -> int:
 
 async def get_device_vulns(device_id: str) -> list[dict]:
     async with get_db() as db:
-        rows = await (await db.execute(
-            """SELECT * FROM vuln_results WHERE device_id = ?
+        rows = await (
+            await db.execute(
+                """SELECT * FROM vuln_results WHERE device_id = ?
                ORDER BY score DESC, detected_at DESC""",
-            (device_id,),
-        )).fetchall()
+                (device_id,),
+            )
+        ).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -241,28 +253,32 @@ async def get_all_vulns(
     params += [limit, offset]
 
     async with get_db() as db:
-        rows = await (await db.execute(
-            f"""SELECT v.*, d.ip as device_ip, d.hostname as device_hostname, d.label as device_label
+        rows = await (
+            await db.execute(
+                f"""SELECT v.*, d.ip as device_ip, d.hostname as device_hostname, d.label as device_label
                 FROM vuln_results v
                 LEFT JOIN devices d ON d.id = v.device_id
                 {where}
                 ORDER BY v.score DESC, v.detected_at DESC
                 LIMIT ? OFFSET ?""",
-            params,
-        )).fetchall()
+                params,
+            )
+        ).fetchall()
 
     return [dict(r) for r in rows]
 
 
 async def get_vuln_stats() -> dict:
     async with get_db() as db:
-        rows = await (await db.execute(
-            "SELECT severity, COUNT(*) as count FROM vuln_results GROUP BY severity"
-        )).fetchall()
+        rows = await (
+            await db.execute(
+                "SELECT severity, COUNT(*) as count FROM vuln_results GROUP BY severity"
+            )
+        ).fetchall()
         total = await (await db.execute("SELECT COUNT(*) FROM vuln_results")).fetchone()
-        devices_affected = await (await db.execute(
-            "SELECT COUNT(DISTINCT device_id) FROM vuln_results"
-        )).fetchone()
+        devices_affected = await (
+            await db.execute("SELECT COUNT(DISTINCT device_id) FROM vuln_results")
+        ).fetchone()
 
     by_sev = {r["severity"]: r["count"] for r in rows}
     return {

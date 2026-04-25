@@ -10,6 +10,7 @@ Two things that really must not break:
      100-row window. One accidental loop that writes 10k rows shouldn't
      blow SQLite; the trim-on-insert keeps the table capped.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -32,16 +33,20 @@ async def test_write_and_list_roundtrip(initialised_db):
 
 
 async def test_scrubs_sensitive_keys(initialised_db):
-    await write_audit("settings_save", "user", {
-        "username": "alice",
-        "password": "hunter2",
-        "api_key": "k-xyz",
-        "token": "pat_abc",
-        "nested": {"private_key": "-----BEGIN RSA-----..."},
-    })
+    await write_audit(
+        "settings_save",
+        "user",
+        {
+            "username": "alice",
+            "password": "hunter2",
+            "api_key": "k-xyz",
+            "token": "pat_abc",
+            "nested": {"private_key": "-----BEGIN RSA-----..."},
+        },
+    )
     rows = await list_audit()
     d = rows[0]["detail"]
-    assert d["username"] == "alice"          # non-sensitive passes through
+    assert d["username"] == "alice"  # non-sensitive passes through
     assert d["password"] == "***"
     assert d["api_key"] == "***"
     assert d["token"] == "***"
@@ -56,9 +61,13 @@ async def test_scrubs_secretstr_values(initialised_db):
     # Even when the KEY isn't on the sensitive list, a SecretStr value
     # must be redacted — defence against the "someone forgot to rename"
     # case where a config is dumped whole into the audit detail.
-    await write_audit("settings_save", "user", {
-        "custom_field": SecretStr("oops-plaintext-in-audit"),
-    })
+    await write_audit(
+        "settings_save",
+        "user",
+        {
+            "custom_field": SecretStr("oops-plaintext-in-audit"),
+        },
+    )
     rows = await list_audit()
     d = rows[0]["detail"]
     assert d["custom_field"] == "***"
@@ -74,7 +83,7 @@ async def test_retention_trims_oldest(initialised_db):
     # Newest first: the most recent writes survive. The last N=max_entries
     # writes (n = 5..104) should be present, n=0..4 gone.
     ns = sorted([r["detail"]["n"] for r in rows])
-    assert ns[0] == 5           # oldest survivor
+    assert ns[0] == 5  # oldest survivor
     assert ns[-1] == AUDIT_MAX_ENTRIES + 4
 
 
@@ -83,7 +92,9 @@ async def test_list_limit_capped(initialised_db):
     for i in range(10):
         await write_audit("x", "system", {"i": i})
     assert len(await list_audit(limit=0)) == 1  # clamped up
-    assert len(await list_audit(limit=10_000)) == 10  # clamped down to cap, but we only have 10
+    assert (
+        len(await list_audit(limit=10_000)) == 10
+    )  # clamped down to cap, but we only have 10
     assert len(await list_audit(limit=3)) == 3
 
 

@@ -11,6 +11,7 @@ We test by constructing a tiny FastAPI app and driving it with
 TestClient, rather than importing the whole main.py — faster and
 avoids scheduler/DB initialisation.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -85,7 +86,9 @@ class TestSetToken:
     def test_bearer_is_case_insensitive(self, client: TestClient):
         # "bearer" / "Bearer" / "BEARER" all work.
         for scheme in ("bearer", "Bearer", "BEARER"):
-            r = client.get("/api/ping", headers={"Authorization": f"{scheme} s3cret-token"})
+            r = client.get(
+                "/api/ping", headers={"Authorization": f"{scheme} s3cret-token"}
+            )
             assert r.status_code == 200, f"failed for scheme {scheme}"
 
     def test_query_param_token(self, client: TestClient):

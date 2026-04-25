@@ -4,7 +4,7 @@ import json
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 
 from database import get_db
 from models.topology import TopologyGraph
@@ -18,6 +18,7 @@ _MOCK = os.getenv("BACKEND_MOCK", "false").lower() == "true"
 async def get_topology():
     if _MOCK:
         from mock.topology_fixtures import MOCK_TOPOLOGY
+
         return MOCK_TOPOLOGY
 
     async with get_db() as db:
@@ -30,26 +31,30 @@ async def get_topology():
         )
         rows = await cursor.fetchall()
 
-    from models.topology import NetworkNode, NetworkEdge, NodeData, NodePosition
+    from models.topology import NetworkNode, NodeData, NodePosition
     from datetime import datetime
 
     nodes = []
     for row in rows:
         meta = json.loads(row["metadata"] or "{}")
-        nodes.append(NetworkNode(
-            id=row["id"],
-            position=NodePosition(x=row["position_x"] or 0, y=row["position_y"] or 0),
-            data=NodeData(
-                device_id=row["id"],
-                label=row["label"] or row["hostname"] or row["ip"] or row["id"],
-                device_type=row["device_type"] or "unknown",
-                status="online" if row["is_online"] else "offline",
-                ip=row["ip"],
-                vuln_critical=row["vuln_critical"] or 0,
-                vuln_high=row["vuln_high"] or 0,
-                metadata=meta,
-            ),
-        ))
+        nodes.append(
+            NetworkNode(
+                id=row["id"],
+                position=NodePosition(
+                    x=row["position_x"] or 0, y=row["position_y"] or 0
+                ),
+                data=NodeData(
+                    device_id=row["id"],
+                    label=row["label"] or row["hostname"] or row["ip"] or row["id"],
+                    device_type=row["device_type"] or "unknown",
+                    status="online" if row["is_online"] else "offline",
+                    ip=row["ip"],
+                    vuln_critical=row["vuln_critical"] or 0,
+                    vuln_high=row["vuln_high"] or 0,
+                    metadata=meta,
+                ),
+            )
+        )
 
     return TopologyGraph(
         nodes=nodes,
@@ -86,6 +91,7 @@ async def get_latency(
         # Return a short synthetic series so the chart renders in mock mode
         from datetime import datetime, timedelta, timezone
         import random
+
         now = datetime.now(timezone.utc)
         samples = [
             {
@@ -94,40 +100,51 @@ async def get_latency(
             }
             for i in range(120)
         ]
-        return {"device_id": "mock-gw", "device_label": "Gateway (mock)", "samples": samples}
+        return {
+            "device_id": "mock-gw",
+            "device_label": "Gateway (mock)",
+            "samples": samples,
+        }
 
     from datetime import datetime, timedelta, timezone
-    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=window_minutes)).isoformat()
+
+    cutoff = (
+        datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
+    ).isoformat()
 
     async with get_db() as db:
         if not device_id:
             # Pick the first gateway as the default target
-            gw_row = await (await db.execute(
-                "SELECT id, label, hostname, ip FROM devices WHERE device_type = 'gateway' ORDER BY id LIMIT 1"
-            )).fetchone()
+            gw_row = await (
+                await db.execute(
+                    "SELECT id, label, hostname, ip FROM devices WHERE device_type = 'gateway' ORDER BY id LIMIT 1"
+                )
+            ).fetchone()
             if not gw_row:
                 return {"device_id": None, "device_label": None, "samples": []}
             device_id = gw_row["id"]
             label = gw_row["label"] or gw_row["hostname"] or gw_row["ip"] or "Gateway"
         else:
-            d_row = await (await db.execute(
-                "SELECT id, label, hostname, ip FROM devices WHERE id = ?", (device_id,)
-            )).fetchone()
+            d_row = await (
+                await db.execute(
+                    "SELECT id, label, hostname, ip FROM devices WHERE id = ?",
+                    (device_id,),
+                )
+            ).fetchone()
             if not d_row:
                 raise HTTPException(status_code=404, detail="Device not found")
             label = d_row["label"] or d_row["hostname"] or d_row["ip"] or device_id
 
-        rows = await (await db.execute(
-            """SELECT ts, latency_ms FROM latency_samples
+        rows = await (
+            await db.execute(
+                """SELECT ts, latency_ms FROM latency_samples
                WHERE device_id = ? AND ts >= ?
                ORDER BY ts ASC""",
-            (device_id, cutoff),
-        )).fetchall()
+                (device_id, cutoff),
+            )
+        ).fetchall()
 
-    samples = [
-        {"ts": r["ts"], "latency_ms": r["latency_ms"]}
-        for r in rows
-    ]
+    samples = [{"ts": r["ts"], "latency_ms": r["latency_ms"]} for r in rows]
     return {"device_id": device_id, "device_label": label, "samples": samples}
 
 
@@ -135,6 +152,7 @@ async def get_latency(
 async def get_network_status():
     if _MOCK:
         from mock.fixtures import MOCK_DEVICES
+
         online = sum(1 for d in MOCK_DEVICES if d.is_online)
         return {
             "total": len(MOCK_DEVICES),
@@ -146,8 +164,18 @@ async def get_network_status():
 
     async with get_db() as db:
         total = (await (await db.execute("SELECT COUNT(*) FROM devices")).fetchone())[0]
-        online = (await (await db.execute("SELECT COUNT(*) FROM devices WHERE is_online = 1")).fetchone())[0]
-        unknown = (await (await db.execute("SELECT COUNT(*) FROM devices WHERE device_type = 'unknown'")).fetchone())[0]
+        online = (
+            await (
+                await db.execute("SELECT COUNT(*) FROM devices WHERE is_online = 1")
+            ).fetchone()
+        )[0]
+        unknown = (
+            await (
+                await db.execute(
+                    "SELECT COUNT(*) FROM devices WHERE device_type = 'unknown'"
+                )
+            ).fetchone()
+        )[0]
 
     return {
         "total": total,

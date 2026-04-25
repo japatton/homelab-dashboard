@@ -56,6 +56,7 @@ shows."""
 
 # ── Aggregation ──────────────────────────────────────────────────────────────
 
+
 async def _aggregate_es_stats(period_hours: int = 24) -> dict:
     """Pull per-window stats from Elasticsearch. Always returns a dict —
     fields default to empty/zero when ES is absent or a query fails so the
@@ -165,14 +166,16 @@ async def _aggregate_es_stats(period_hours: int = 24) -> dict:
         tops = []
         for hit in r.get("hits", {}).get("hits", [])[:10]:
             s = hit.get("_source", {})
-            tops.append({
-                "name": (s.get("name") or "")[:120],
-                "cve": s.get("cve_id") or "",
-                "severity": s.get("severity"),
-                "score": s.get("score"),
-                "device_ip": s.get("device_ip"),
-                "port": s.get("port"),
-            })
+            tops.append(
+                {
+                    "name": (s.get("name") or "")[:120],
+                    "cve": s.get("cve_id") or "",
+                    "severity": s.get("severity"),
+                    "score": s.get("score"),
+                    "device_ip": s.get("device_ip"),
+                    "port": s.get("port"),
+                }
+            )
         stats["vulns"]["top_findings"] = tops
         stats["scans"]["total_findings"] = stats["vulns"]["new_in_period"]
     except Exception as e:
@@ -189,13 +192,12 @@ def _build_prompt(stats: dict) -> str:
         f"{stats['period']['hours']} hours "
         f"({stats['period']['start']} → {stats['period']['end']}). "
         "Produce the daily brief as described in the system prompt.\n\n"
-        "```json\n"
-        + json.dumps(stats, indent=2, default=str)
-        + "\n```"
+        "```json\n" + json.dumps(stats, indent=2, default=str) + "\n```"
     )
 
 
 # ── Orchestration ────────────────────────────────────────────────────────────
+
 
 async def run_daily_analysis(period_hours: int = 24) -> Optional[str]:
     """Collect → prompt → call model → persist. Returns report id or None
@@ -245,8 +247,12 @@ async def run_daily_analysis(period_hours: int = 24) -> Optional[str]:
             error=None,
             duration_ms=duration_ms,
         )
-        log.info("daily_analysis: report %s stored (%d ms, %d chars)",
-                 report_id, duration_ms, len(summary))
+        log.info(
+            "daily_analysis: report %s stored (%d ms, %d chars)",
+            report_id,
+            duration_ms,
+            len(summary),
+        )
         return report_id
 
     except Exception as e:
@@ -290,9 +296,18 @@ async def _persist_report(
                 summary_md, input_json, raw_prompt, raw_response, error, duration_ms)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
-                report_id, generated_at, period_start, period_end, model, status,
-                summary_md, json.dumps(input_json, default=str),
-                raw_prompt, raw_response, error, duration_ms,
+                report_id,
+                generated_at,
+                period_start,
+                period_end,
+                model,
+                status,
+                summary_md,
+                json.dumps(input_json, default=str),
+                raw_prompt,
+                raw_response,
+                error,
+                duration_ms,
             ),
         )
         await db.commit()
@@ -300,25 +315,30 @@ async def _persist_report(
 
 # ── Read helpers used by the API ─────────────────────────────────────────────
 
+
 async def list_reports(limit: int = 50) -> list[dict]:
     async with get_db() as db:
-        rows = await (await db.execute(
-            """SELECT id, generated_at, period_start, period_end, model,
+        rows = await (
+            await db.execute(
+                """SELECT id, generated_at, period_start, period_end, model,
                       status, duration_ms,
                       substr(coalesce(summary_md, error, ''), 1, 300) AS preview
                FROM analysis_reports
                ORDER BY generated_at DESC
                LIMIT ?""",
-            (limit,),
-        )).fetchall()
+                (limit,),
+            )
+        ).fetchall()
     return [dict(r) for r in rows]
 
 
 async def get_report(report_id: str) -> Optional[dict]:
     async with get_db() as db:
-        row = await (await db.execute(
-            "SELECT * FROM analysis_reports WHERE id = ?", (report_id,)
-        )).fetchone()
+        row = await (
+            await db.execute(
+                "SELECT * FROM analysis_reports WHERE id = ?", (report_id,)
+            )
+        ).fetchone()
     if not row:
         return None
     d = dict(row)
@@ -332,6 +352,8 @@ async def get_report(report_id: str) -> Optional[dict]:
 
 async def delete_report(report_id: str) -> bool:
     async with get_db() as db:
-        cur = await db.execute("DELETE FROM analysis_reports WHERE id = ?", (report_id,))
+        cur = await db.execute(
+            "DELETE FROM analysis_reports WHERE id = ?", (report_id,)
+        )
         await db.commit()
         return (cur.rowcount or 0) > 0

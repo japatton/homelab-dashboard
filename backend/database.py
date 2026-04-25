@@ -238,9 +238,11 @@ async def _migrate_vuln_results(db: aiosqlite.Connection) -> None:
     Safe to run repeatedly — every step is idempotent.
     """
     # Skip everything if the table doesn't exist yet (fresh install).
-    row = await (await db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='vuln_results'"
-    )).fetchone()
+    row = await (
+        await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='vuln_results'"
+        )
+    ).fetchone()
     if row is None:
         return
 
@@ -299,16 +301,27 @@ async def _migrate_scan_credentials(db: aiosqlite.Connection) -> None:
     Idempotent: each ALTER is guarded by a duplicate-column catch.
     """
     # Skip if the table isn't there (fresh install — schema handled it).
-    row = await (await db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='scan_credentials'"
-    )).fetchone()
+    row = await (
+        await db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='scan_credentials'"
+        )
+    ).fetchone()
     if row is None:
         return
 
     for col, ddl in (
-        ("auth_type",      "ALTER TABLE scan_credentials ADD COLUMN auth_type TEXT DEFAULT 'password'"),
-        ("private_key",    "ALTER TABLE scan_credentials ADD COLUMN private_key TEXT DEFAULT ''"),
-        ("key_passphrase", "ALTER TABLE scan_credentials ADD COLUMN key_passphrase TEXT DEFAULT ''"),
+        (
+            "auth_type",
+            "ALTER TABLE scan_credentials ADD COLUMN auth_type TEXT DEFAULT 'password'",
+        ),
+        (
+            "private_key",
+            "ALTER TABLE scan_credentials ADD COLUMN private_key TEXT DEFAULT ''",
+        ),
+        (
+            "key_passphrase",
+            "ALTER TABLE scan_credentials ADD COLUMN key_passphrase TEXT DEFAULT ''",
+        ),
     ):
         try:
             await db.execute(ddl)
