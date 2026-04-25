@@ -1,6 +1,6 @@
 # Pin exact node + nginx versions so a silent upstream retag can't break
 # reproducibility. Bump intentionally after local verification.
-FROM node:20.19.6-slim AS build
+FROM node:20.20.2-slim AS build
 
 WORKDIR /app
 
