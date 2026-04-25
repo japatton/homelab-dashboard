@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-04-25
+
+Maintenance release. Major dependency ecosystem refresh, CI hardening, and
+ruff-driven code-quality cleanup. No user-visible feature changes.
+
+### Changed
+- **Backend dependencies refreshed** — fastapi 0.115 → 0.136.1,
+  uvicorn 0.30 → 0.46, python-socketio 5.11 → 5.16, httpx 0.27 → 0.28.1,
+  aiohttp 3.10 → 3.13.5, pydantic 2.9 → 2.13.3, pydantic-settings
+  2.5 → 2.14, PyYAML 6.0.2 → 6.0.3, aiosqlite 0.20 → 0.22.1, apscheduler
+  3.10 → 3.11.2, python-dotenv 1.0 → 1.2.2, asyncssh 2.17 → 2.22,
+  python-multipart 0.0.9 → 0.0.26, elasticsearch[async] 8.15 → 9.3.0.
+- **Backend test stack refreshed** — pytest 8.3 → 9.0.3, pytest-asyncio
+  0.24 → 1.3.0, pytest-cov 5.0 → 7.1.0, types-PyYAML and httpx[http2]
+  pins synced to runtime, respx 0.21 → 0.22 (required for httpx 0.28
+  mock compatibility — without this, OPNsense/Firewalla integration
+  tests silently returned empty results).
+- **Frontend dependencies refreshed** — React + react-dom 18.3 → 19.2,
+  @types/react + react-dom 18.3 → 19.2, vite 5.3 → 8.0 (Rolldown
+  bundler), @vitejs/plugin-react 4 → 6, @react-three/fiber 8 → 9,
+  @react-three/drei 9 → 10, @react-three/postprocessing 2 → 3,
+  @tanstack/react-query 5.51 → 5.100, axios 1.7 → 1.15,
+  three 0.169 → 0.184, eslint-plugin-react-hooks 5 → 7, globals 15 → 17,
+  typescript-eslint 8.18 → 8.59, eslint-plugin-react-refresh 0.4 → 0.5.
+- **CI actions** — actions/setup-python v5 → v6, actions/setup-node
+  v4 → v6, docker/setup-buildx-action v3 → v4.
+- **Docker base images** — nginx 1.27.3 → 1.29.8 (frontend), node
+  20.18.1 → 20.19.6 (forced by transitive engine pins on
+  @csstools/css-color-parser, eslint-visitor-keys, entities).
+- **Dependabot policy hardened** — `dependabot.yml` now ignores
+  semver-major + semver-minor for Docker `python` (stays on 3.12.x
+  line) and semver-major for Docker `node` (stays on even-numbered
+  LTS line). Pre-release Python 3.14 and odd-numbered Node 25 are no
+  longer auto-proposed.
+- **Vite 8 / Rolldown adoption** — `manualChunks` rewritten from object
+  to function form (Rolldown requires it). Same three-way split
+  (three / reactflow / vendor + app shell) is preserved so lazy-loading
+  behaviour is unchanged.
+
+### Fixed
+- **Backend ruff lint clean** — 78 errors triaged (38 auto-fixable,
+  40 hand-fixed across F401/F841/E402/E741) plus a `ruff format` pass
+  across 55 files. `ruff check` + `ruff format --check` are now gating
+  CI steps.
+- **Toast dismiss test flake** — replaced `waitForElementToBeRemoved`
+  with `waitFor(() => expect(...).not.toBeInTheDocument())` to fix a
+  Node 20 / jsdom timing race where AnimatePresence exit was
+  synchronous and the helper threw "element was already removed".
+- **Frontend lockfile** — regenerated under Node 20.19.6-slim so
+  `npm ci` no longer rejects in CI's pinned environment (npm 10
+  vs npm 11 lockfile-v3 nested-dep handling).
+- **CI coverage step** — added `@vitest/coverage-v8` to
+  `devDependencies`. The previous CI run failed at startup with
+  "MISSING DEPENDENCY '@vitest/coverage-v8'".
+- **DeviceNode.tsx type strictness** — `Record<string, React.ElementType>`
+  → `Record<string, LucideIcon>`. The new @types/react 19 infers
+  `ElementType`'s prop type as `never` for the ambiguous fallback,
+  which broke `<Icon size={18} style={...}>`.
+- **useTopology.ts useRef** — pass an explicit `undefined` initial
+  argument; React 19's @types/react no longer accepts the zero-arg
+  form for non-DOM refs.
+
+### Internal
+- Code-quality follow-ups flagged for future PRs:
+  - `eslint-plugin-react-hooks` v7's two new rules
+    (`set-state-in-effect`, `refs`) are temporarily disabled in
+    `eslint.config.js` — re-enable and refactor the 9 sites in
+    `SettingsPage.tsx`, `useSocket.ts`, and `DevicesPage.tsx`.
+  - `elasticsearch-py` 9 still accepts the deprecated `body=` kwarg;
+    modernize the two call sites in
+    `backend/integrations/elasticsearch_client.py` to explicit
+    fields (`query=`, `mappings=`, `settings=`).
+
+---
+
+## [1.0.0] — 2026-04-24
+
+Initial public release. Everything below shipped from the v0.1.0
+baseline through the public-readiness sweep (docs, GitHub
+infrastructure, test suites, security hardening).
+
 ### Added
 - **Gateway integrations — OPNsense**: full REST-API adapter covering firmware
   probe, interface roster, ARP + DHCP leases, and Suricata IDS alert feed.
@@ -137,5 +218,7 @@ began; documented here for provenance since there was no prior changelog.
 
 ---
 
-[Unreleased]: https://github.com/YOUR-ORG/homelab-dashboard/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/YOUR-ORG/homelab-dashboard/releases/tag/v0.1.0
+[Unreleased]: https://github.com/japatton/homelab-dashboard/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/japatton/homelab-dashboard/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/japatton/homelab-dashboard/compare/v0.1.0...v1.0.0
+[0.1.0]: https://github.com/japatton/homelab-dashboard/releases/tag/v0.1.0
