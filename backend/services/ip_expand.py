@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 IP pattern expansion used by the Scan Credentials test endpoint.
 
@@ -13,6 +11,8 @@ Accepts:
 Caps expansion at EXPAND_MAX_HOSTS so a fat-fingered "10.0.0.0/8" can't
 spawn a 16M-host SSH sweep.
 """
+
+from __future__ import annotations
 
 import ipaddress
 import re

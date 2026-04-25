@@ -39,6 +39,7 @@ async def analyze_unknown_device(device: Device) -> str | None:
         return None
 
     from config import get_config_manager
+
     cfg = get_config_manager().get()
     if not cfg.claude.enabled:
         log.debug("Claude integration disabled — skipping analysis for %s", device.id)
@@ -55,11 +56,13 @@ async def _analyze_unknown_device_locked(device: Device, cfg) -> str | None:
 
     # Don't re-analyse a device that already has a pending staged change
     async with get_db() as db:
-        existing = await (await db.execute(
-            """SELECT id FROM claude_staged_changes
+        existing = await (
+            await db.execute(
+                """SELECT id FROM claude_staged_changes
                WHERE device_id = ? AND status = 'pending'""",
-            (device.id,),
-        )).fetchone()
+                (device.id,),
+            )
+        ).fetchone()
     if existing:
         log.debug("Device %s already has a pending staged change — skipping", device.id)
         return None
@@ -70,7 +73,12 @@ async def _analyze_unknown_device_locked(device: Device, cfg) -> str | None:
         "os_guess": device.metadata.get("os_guess"),
         "open_ports": [s.port for s in device.services],
         "services": [
-            {"port": s.port, "protocol": s.protocol, "name": s.name, "version": s.version}
+            {
+                "port": s.port,
+                "protocol": s.protocol,
+                "name": s.name,
+                "version": s.version,
+            }
             for s in device.services
         ],
         "banners": device.metadata.get("banners", {}),
@@ -78,6 +86,7 @@ async def _analyze_unknown_device_locked(device: Device, cfg) -> str | None:
 
     try:
         from services.claude_runner import run_device_analysis
+
         result = await run_device_analysis(device_context)
     except Exception as e:
         log.error("Claude analysis failed for device %s: %s", device.id, e)
@@ -116,16 +125,19 @@ async def _analyze_unknown_device_locked(device: Device, cfg) -> str | None:
     # Emit real-time notification
     try:
         from services.notification_service import get_notification_service
+
         ns = get_notification_service()
-        await ns.emit_claude_staged({
-            "id": change_id,
-            "triggered_at": now,
-            "device_id": device.id,
-            "reason": result["reason"],
-            "diff_preview": result["diff_preview"],
-            "generated_files": result["generated_files"],
-            "status": "pending",
-        })
+        await ns.emit_claude_staged(
+            {
+                "id": change_id,
+                "triggered_at": now,
+                "device_id": device.id,
+                "reason": result["reason"],
+                "diff_preview": result["diff_preview"],
+                "generated_files": result["generated_files"],
+                "status": "pending",
+            }
+        )
     except Exception as e:
         log.warning("Failed to emit claude:staged event: %s", e)
 
@@ -136,6 +148,7 @@ async def _analyze_unknown_device_locked(device: Device, cfg) -> str | None:
 async def run_analysis_for_unknown_devices(devices: list[Device]) -> int:
     """Analyse all unknown devices that qualify. Returns count of new staged changes."""
     from services.device_service import detect_unknown_devices
+
     unknown = detect_unknown_devices(devices)
     count = 0
     for device in unknown:

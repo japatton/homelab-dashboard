@@ -56,7 +56,9 @@ class OllamaIntegration(BaseIntegration):
         """Pings /v1/models. Returns model list in detail on success."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                r = await client.get(f"{self._base_url}/v1/models", headers=self._headers())
+                r = await client.get(
+                    f"{self._base_url}/v1/models", headers=self._headers()
+                )
                 r.raise_for_status()
                 data = r.json()
             models = [m.get("id", "?") for m in data.get("data", [])]
@@ -64,7 +66,9 @@ class OllamaIntegration(BaseIntegration):
             msg = f"Ollama reachable — {len(models)} model(s) available"
             if not has_target and models:
                 msg += f"; configured model '{self._model}' NOT in list"
-            return ConnectionResult.success(msg, models=models, model_present=has_target)
+            return ConnectionResult.success(
+                msg, models=models, model_present=has_target
+            )
         except httpx.HTTPStatusError as e:
             return ConnectionResult.offline(
                 f"HTTP {e.response.status_code}: {e.response.text[:200]}"
@@ -112,7 +116,9 @@ class OllamaIntegration(BaseIntegration):
     async def list_models(self) -> list[str]:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                r = await client.get(f"{self._base_url}/v1/models", headers=self._headers())
+                r = await client.get(
+                    f"{self._base_url}/v1/models", headers=self._headers()
+                )
                 r.raise_for_status()
                 return [m.get("id", "") for m in r.json().get("data", [])]
         except Exception as e:

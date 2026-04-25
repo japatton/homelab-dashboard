@@ -12,6 +12,7 @@ Tests focus on:
   - The 64-host safety cap.
   - Dedup and order preservation.
 """
+
 from __future__ import annotations
 
 import pytest

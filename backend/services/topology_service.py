@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-import json
 import logging
 import math
 from datetime import datetime, timezone
 from typing import Iterable, Optional
 
 from database import get_db
-from models.topology import EdgeData, NetworkEdge, NetworkNode, NodeData, NodePosition, TopologyGraph
+from models.topology import (
+    EdgeData,
+    NetworkEdge,
+    NetworkNode,
+    NodeData,
+    NodePosition,
+    TopologyGraph,
+)
 
 log = logging.getLogger(__name__)
 
@@ -17,8 +23,8 @@ _CENTER_X = 0.0
 _CENTER_Y = 0.0
 _INFRA_RADIUS = 260.0
 _ENDPOINT_BASE_RADIUS = 560.0
-_ENDPOINT_RING_STEP = 220.0          # radius added per additional ring
-_MAX_PER_RING = 36                   # split endpoints into rings of <= this many
+_ENDPOINT_RING_STEP = 220.0  # radius added per additional ring
+_MAX_PER_RING = 36  # split endpoints into rings of <= this many
 
 _GATEWAY_TYPES = {"gateway"}
 _INFRA_TYPES = {"switch", "ap"}
@@ -46,27 +52,32 @@ async def build_topology_graph(devices: list, unifi_topology=None) -> TopologyGr
     endpoints in one or more concentric outer rings. Saved positions
     (user-dragged) always win.
     """
-    from models.device import Device
 
     # Load saved node positions + staged-integration ids
     saved_positions: dict[str, tuple[float, float]] = {}
     staged_ids: set[str] = set()
 
     async with get_db() as db:
-        rows = await (await db.execute(
-            "SELECT id, position_x, position_y FROM devices WHERE position_x != 0 OR position_y != 0"
-        )).fetchall()
+        rows = await (
+            await db.execute(
+                "SELECT id, position_x, position_y FROM devices WHERE position_x != 0 OR position_y != 0"
+            )
+        ).fetchall()
         for row in rows:
             saved_positions[row["id"]] = (row["position_x"], row["position_y"])
 
-        staged_rows = await (await db.execute(
-            "SELECT device_id FROM claude_staged_changes WHERE status = 'pending'"
-        )).fetchall()
+        staged_rows = await (
+            await db.execute(
+                "SELECT device_id FROM claude_staged_changes WHERE status = 'pending'"
+            )
+        ).fetchall()
         staged_ids = {r["device_id"] for r in staged_rows}
 
     gateways = [d for d in devices if d.device_type in _GATEWAY_TYPES]
     infra = [d for d in devices if d.device_type in _INFRA_TYPES]
-    endpoints = [d for d in devices if d.device_type not in _GATEWAY_TYPES | _INFRA_TYPES]
+    endpoints = [
+        d for d in devices if d.device_type not in _GATEWAY_TYPES | _INFRA_TYPES
+    ]
 
     # --- Gateway(s) ---
     # Single gateway → center. Multiple gateways → small inner cluster.
@@ -80,7 +91,9 @@ async def build_topology_graph(devices: list, unifi_topology=None) -> TopologyGr
     # --- Infra ring ---
     infra_positions: dict[str, tuple[float, float]] = {}
     # Slight rotational offset so switches don't sit directly above the gateway icon
-    for dev, (x, y) in zip(infra, _ring_positions(len(infra), _INFRA_RADIUS, angle_offset=-math.pi / 2)):
+    for dev, (x, y) in zip(
+        infra, _ring_positions(len(infra), _INFRA_RADIUS, angle_offset=-math.pi / 2)
+    ):
         infra_positions[dev.id] = (x, y)
 
     # --- Endpoint ring(s) ---
@@ -95,7 +108,9 @@ async def build_topology_graph(devices: list, unifi_topology=None) -> TopologyGr
             radius = _ENDPOINT_BASE_RADIUS + (ring_idx * _ENDPOINT_RING_STEP)
             # Stagger adjacent rings so labels don't line up radially
             offset = (math.pi / _MAX_PER_RING) if ring_idx % 2 else 0.0
-            for dev, (x, y) in zip(ring_devs, _ring_positions(len(ring_devs), radius, angle_offset=offset)):
+            for dev, (x, y) in zip(
+                ring_devs, _ring_positions(len(ring_devs), radius, angle_offset=offset)
+            ):
                 endpoint_positions[dev.id] = (x, y)
 
     computed = {**gateway_positions, **infra_positions, **endpoint_positions}
@@ -109,24 +124,29 @@ async def build_topology_graph(devices: list, unifi_topology=None) -> TopologyGr
             x, y = computed[device.id]
         else:
             # Fallback: place on a far outer ring so it's visible but out of the way
-            x, y = _CENTER_X, _CENTER_Y + _ENDPOINT_BASE_RADIUS + (3 * _ENDPOINT_RING_STEP)
+            x, y = (
+                _CENTER_X,
+                _CENTER_Y + _ENDPOINT_BASE_RADIUS + (3 * _ENDPOINT_RING_STEP),
+            )
 
-        nodes.append(NetworkNode(
-            id=device.id,
-            position=NodePosition(x=x, y=y),
-            data=NodeData(
-                device_id=device.id,
-                label=device.label or device.hostname or device.ip or device.id,
-                device_type=device.device_type,
-                status=device.status,
-                ip=device.ip,
-                mac=device.mac,
-                services_count=len(device.services),
-                vuln_critical=device.vuln_summary.critical,
-                vuln_high=device.vuln_summary.high,
-                has_staged_integration=device.id in staged_ids,
-            ),
-        ))
+        nodes.append(
+            NetworkNode(
+                id=device.id,
+                position=NodePosition(x=x, y=y),
+                data=NodeData(
+                    device_id=device.id,
+                    label=device.label or device.hostname or device.ip or device.id,
+                    device_type=device.device_type,
+                    status=device.status,
+                    ip=device.ip,
+                    mac=device.mac,
+                    services_count=len(device.services),
+                    vuln_critical=device.vuln_summary.critical,
+                    vuln_high=device.vuln_summary.high,
+                    has_staged_integration=device.id in staged_ids,
+                ),
+            )
+        )
 
     edges = _build_edges(devices, unifi_topology)
 
@@ -144,25 +164,33 @@ def _build_edges(devices: list, unifi_topology) -> list[NetworkEdge]:
     device_ids = {d.id for d in devices}
     seen: set[str] = set()
 
-    def add_edge(src: str, tgt: str, conn_type: str, bandwidth: Optional[float] = None, signal: Optional[int] = None):
+    def add_edge(
+        src: str,
+        tgt: str,
+        conn_type: str,
+        bandwidth: Optional[float] = None,
+        signal: Optional[int] = None,
+    ):
         edge_id = f"e-{src[:8]}-{tgt[:8]}"
         if edge_id in seen:
             return
         seen.add(edge_id)
-        edges.append(NetworkEdge(
-            id=edge_id,
-            source=src,
-            target=tgt,
-            # Animation only on wireless links — avoids 100+ animated wired
-            # edges chewing repaint time on large homelabs.
-            animated=(conn_type == "wireless"),
-            data=EdgeData(
-                connection_type=conn_type,  # type: ignore[arg-type]
-                bandwidth_mbps=bandwidth,
-                signal_strength=signal,
-                is_active=True,
-            ),
-        ))
+        edges.append(
+            NetworkEdge(
+                id=edge_id,
+                source=src,
+                target=tgt,
+                # Animation only on wireless links — avoids 100+ animated wired
+                # edges chewing repaint time on large homelabs.
+                animated=(conn_type == "wireless"),
+                data=EdgeData(
+                    connection_type=conn_type,  # type: ignore[arg-type]
+                    bandwidth_mbps=bandwidth,
+                    signal_strength=signal,
+                    is_active=True,
+                ),
+            )
+        )
 
     if unifi_topology:
         # Use actual UniFi topology data for managed devices
@@ -205,7 +233,6 @@ def _build_edges(devices: list, unifi_topology) -> list[NetworkEdge]:
                     add_edge(gw.id, ep.id, "wired")
     else:
         switches = [d for d in infra if d.device_type == "switch"]
-        aps = [d for d in infra if d.device_type == "ap"]
         anchor = switches[0] if switches else (gateways[0] if gateways else None)
 
         for ep in endpoints:

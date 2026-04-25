@@ -4,10 +4,8 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
 from typing import Optional
 from xml.etree import ElementTree as ET
-from xml.sax.saxutils import escape as xml_escape
 
 from .base import BaseIntegration, ConnectionResult
 
@@ -33,7 +31,9 @@ def _band(score: float) -> str:
 class OpenVASIntegration(BaseIntegration):
     name = "openvas"
 
-    def __init__(self, host: str, port: int = 9390, username: str = "admin", password: str = ""):
+    def __init__(
+        self, host: str, port: int = 9390, username: str = "admin", password: str = ""
+    ):
         self._host = host
         self._port = port
         self._username = username
@@ -42,6 +42,7 @@ class OpenVASIntegration(BaseIntegration):
     def _get_gmp(self):
         from gvm.connections import TLSConnection
         from gvm.protocols.gmp import GMPv224
+
         # Use the version-specific wrapper, not the auto-selecting `Gmp`. On
         # python-gvm 26.2 the outer `Gmp` does not expose `authenticate` until
         # protocol negotiation inside `__enter__`, and even then some methods
@@ -74,7 +75,8 @@ class OpenVASIntegration(BaseIntegration):
             # 'auth failed' produce distinct messages.
             try:
                 reader, writer = await asyncio.wait_for(
-                    asyncio.open_connection(self._host, self._port), timeout=4.0,
+                    asyncio.open_connection(self._host, self._port),
+                    timeout=4.0,
                 )
                 writer.close()
                 try:
@@ -104,7 +106,9 @@ class OpenVASIntegration(BaseIntegration):
                     return root.findtext("version") or "unknown"
 
             version = await asyncio.to_thread(_check)
-            return ConnectionResult.success(f"OpenVAS GMP {version} — authenticated as {self._username}")
+            return ConnectionResult.success(
+                f"OpenVAS GMP {version} — authenticated as {self._username}"
+            )
         except ImportError:
             return ConnectionResult.offline("python-gvm not installed")
         except Exception as e:
@@ -169,7 +173,8 @@ class OpenVASIntegration(BaseIntegration):
         except Exception as e:
             log.warning(
                 "get_scanners failed (%s) — reauthenticating on new socket "
-                "and using the OpenVAS Default UUID", e,
+                "and using the OpenVAS Default UUID",
+                e,
             )
             # The broken socket has been replaced by python-gvm; the new one
             # is unauthenticated. Re-authenticate so the rest of the scan
@@ -185,7 +190,9 @@ class OpenVASIntegration(BaseIntegration):
         # present on immauss/openvas builds via `gvmd --verify-scanner`.
         return "08b69003-5fc2-4037-a479-93b440211c73"
 
-    def _run_scan_sync(self, ip: str, scan_config: str, credentials: dict) -> list[dict]:
+    def _run_scan_sync(
+        self, ip: str, scan_config: str, credentials: dict
+    ) -> list[dict]:
         """High-level python-gvm scan implementation.
 
         Previous iterations tried raw-XML-over-same-socket and
@@ -283,8 +290,14 @@ class OpenVASIntegration(BaseIntegration):
                     except Exception as e:
                         log.warning("Credential creation failed for %s: %s", ip, e)
 
-                log.info("OpenVAS scan %s: scanner=%s config=%s port_list=%s cred=%s",
-                         ip, scanner_id, scan_config, port_list_id, cred_id)
+                log.info(
+                    "OpenVAS scan %s: scanner=%s config=%s port_list=%s cred=%s",
+                    ip,
+                    scanner_id,
+                    scan_config,
+                    port_list_id,
+                    cred_id,
+                )
 
                 # Create target
                 step = "create_target"
@@ -337,6 +350,7 @@ class OpenVASIntegration(BaseIntegration):
                 # OpenVAS queues scans when >1 runs at once).
                 step = "poll"
                 import time
+
                 last_logged_progress = -2
                 final_status = ""
                 # NOTE: `time.sleep` is intentional here — this whole
@@ -352,25 +366,41 @@ class OpenVASIntegration(BaseIntegration):
                     progress = task_root.findtext("task/progress") or "?"
                     final_status = status
                     # Log on status change or every ~60s of Running
-                    if (progress != last_logged_progress and i % 12 == 0) or status in ("Done", "Stopped"):
-                        log.info("OpenVAS scan %s: status=%s progress=%s (poll %d/720)",
-                                 ip, status, progress, i)
+                    if (progress != last_logged_progress and i % 12 == 0) or status in (
+                        "Done",
+                        "Stopped",
+                    ):
+                        log.info(
+                            "OpenVAS scan %s: status=%s progress=%s (poll %d/720)",
+                            ip,
+                            status,
+                            progress,
+                            i,
+                        )
                         last_logged_progress = progress
                     if status in ("Done", "Stopped"):
                         break
                     if status == "":
                         break
                 else:
-                    log.warning("OpenVAS scan %s: poll timed out after 60 min "
-                                "(last status=%s)", ip, final_status)
+                    log.warning(
+                        "OpenVAS scan %s: poll timed out after 60 min "
+                        "(last status=%s)",
+                        ip,
+                        final_status,
+                    )
 
                 # Fetch results
                 if not report_id:
                     log.warning("OpenVAS scan %s: no report_id, returning empty", ip)
                     return []
                 if final_status != "Done":
-                    log.warning("OpenVAS scan %s: poll exited with status=%s "
-                                "(not Done) — fetching report anyway", ip, final_status)
+                    log.warning(
+                        "OpenVAS scan %s: poll exited with status=%s "
+                        "(not Done) — fetching report anyway",
+                        ip,
+                        final_status,
+                    )
                 step = "get_report"
                 # rows=-1 returns all results (default page size is 10, which
                 # silently truncates any real scan). first=1 sorts from the
@@ -388,12 +418,23 @@ class OpenVASIntegration(BaseIntegration):
                 full = rc.findtext("full") if rc is not None else "?"
                 filtered = rc.findtext("filtered") if rc is not None else "?"
                 raw_result_count = len(report_root.findall(".//result"))
-                log.info("OpenVAS scan %s: report %s result_count full=%s filtered=%s "
-                         "raw_elements=%d", ip, report_id, full, filtered, raw_result_count)
+                log.info(
+                    "OpenVAS scan %s: report %s result_count full=%s filtered=%s "
+                    "raw_elements=%d",
+                    ip,
+                    report_id,
+                    full,
+                    filtered,
+                    raw_result_count,
+                )
                 parsed = _parse_results(report_root)
-                log.info("OpenVAS scan %s: parsed %d findings after severity filter "
-                         "(dropped %d 'log' severity)",
-                         ip, len(parsed), raw_result_count - len(parsed))
+                log.info(
+                    "OpenVAS scan %s: parsed %d findings after severity filter "
+                    "(dropped %d 'log' severity)",
+                    ip,
+                    len(parsed),
+                    raw_result_count - len(parsed),
+                )
                 return parsed
         except Exception as e:
             # Re-raise with the step annotated so the caller logs which
@@ -402,9 +443,11 @@ class OpenVASIntegration(BaseIntegration):
 
     async def get_scan_configs(self) -> list[dict]:
         try:
+
             def _fetch():
                 from gvm.connections import TLSConnection
                 from gvm.protocols.gmp import Gmp
+
                 with Gmp(TLSConnection(hostname=self._host, port=self._port)) as gmp:
                     gmp.authenticate(self._username, self._password)
                     r = gmp.get_scan_configs()
@@ -413,6 +456,7 @@ class OpenVASIntegration(BaseIntegration):
                         {"id": c.get("id"), "name": c.findtext("name", "")}
                         for c in root.findall("config")
                     ]
+
             return await asyncio.to_thread(_fetch)
         except Exception as e:
             log.warning("get_scan_configs failed: %s", e)
@@ -435,7 +479,9 @@ def _parse_results(root: ET.Element) -> list[dict]:
         solution = solution_el.text if solution_el is not None else ""
 
         try:
-            score = float(result.findtext("severity") or nvt.findtext("cvss_base") or "0")
+            score = float(
+                result.findtext("severity") or nvt.findtext("cvss_base") or "0"
+            )
         except ValueError:
             score = 0.0
 
@@ -457,16 +503,18 @@ def _parse_results(root: ET.Element) -> list[dict]:
 
         cve_ids = [ref.get("id", "") for ref in nvt.findall("refs/ref[@type='cve']")]
 
-        vulns.append({
-            "name": name,
-            "description": description[:2000],
-            "solution": (solution or "")[:1000],
-            "score": score,
-            "severity": severity,
-            "port": port,
-            "protocol": protocol,
-            "cve_ids": cve_ids,
-        })
+        vulns.append(
+            {
+                "name": name,
+                "description": description[:2000],
+                "solution": (solution or "")[:1000],
+                "score": score,
+                "severity": severity,
+                "port": port,
+                "protocol": protocol,
+                "cve_ids": cve_ids,
+            }
+        )
 
     if band_counts:
         log.info("OpenVAS severity breakdown: %s", band_counts)

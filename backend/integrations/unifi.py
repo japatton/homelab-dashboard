@@ -15,6 +15,7 @@ log = logging.getLogger(__name__)
 @dataclass
 class UniFiClient:
     """Represents a connected client device."""
+
     mac: str
     ip: Optional[str] = None
     hostname: Optional[str] = None
@@ -33,6 +34,7 @@ class UniFiClient:
 @dataclass
 class UniFiDevice:
     """Represents a UniFi-managed network device (AP, switch, gateway)."""
+
     mac: str
     ip: Optional[str] = None
     name: Optional[str] = None
@@ -82,7 +84,9 @@ class UniFiIntegration(BaseIntegration):
     async def _authenticate(self, client: httpx.AsyncClient) -> bool:
         # Try UDM Pro endpoint first
         for udm in (True, False):
-            login_url = f"{self._url}/api/auth/login" if udm else f"{self._url}/api/login"
+            login_url = (
+                f"{self._url}/api/auth/login" if udm else f"{self._url}/api/login"
+            )
             try:
                 r = await client.post(
                     login_url,
@@ -92,7 +96,9 @@ class UniFiIntegration(BaseIntegration):
                 if r.status_code in (200, 201):
                     self._is_udm = udm
                     self._cookies = dict(r.cookies)
-                    csrf = r.headers.get("X-CSRF-Token") or r.headers.get("x-csrf-token")
+                    csrf = r.headers.get("X-CSRF-Token") or r.headers.get(
+                        "x-csrf-token"
+                    )
                     if csrf:
                         self._headers["X-CSRF-Token"] = csrf
                     return True
@@ -136,7 +142,11 @@ class UniFiIntegration(BaseIntegration):
         try:
             sites = await self.list_sites(client)
         except Exception as e:
-            log.debug("UniFi site list failed, using '%s' as-is: %s", self._site, self._safe_error(e))
+            log.debug(
+                "UniFi site list failed, using '%s' as-is: %s",
+                self._site,
+                self._safe_error(e),
+            )
             self._site_resolved = True
             return
 
@@ -158,7 +168,8 @@ class UniFiIntegration(BaseIntegration):
                 if resolved:
                     log.info(
                         "UniFi: resolved site display-name '%s' → id '%s'",
-                        self._site_configured, resolved,
+                        self._site_configured,
+                        resolved,
                     )
                     self._site = resolved
                     self._site_resolved = True
@@ -185,7 +196,7 @@ class UniFiIntegration(BaseIntegration):
                 if not ok:
                     return ConnectionResult.offline("Authentication failed")
                 await self._resolve_site(c)
-                data = await self._get("stat/health", c)
+                await self._get("stat/health", c)
                 return ConnectionResult.success(
                     f"UniFi {'UDM Pro' if self._is_udm else 'Classic'}",
                     site=self._site,
@@ -237,7 +248,9 @@ def _parse_device(d: dict) -> UniFiDevice:
         device_type=_model_to_type(model),
         firmware=d.get("version", ""),
         uptime=d.get("uptime", 0),
-        port_count=d.get("config_network", {}).get("type") and len(d.get("port_table", [])) or 0,
+        port_count=d.get("config_network", {}).get("type")
+        and len(d.get("port_table", []))
+        or 0,
         uplink_mac=d.get("uplink", {}).get("uplink_mac"),
         clients=[c.get("mac", "") for c in d.get("sta_table", [])],
     )

@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from models.topology import EdgeData, NetworkEdge, NetworkNode, NodeData, NodePosition, TopologyGraph
+from models.topology import (
+    EdgeData,
+    NetworkEdge,
+    NetworkNode,
+    NodeData,
+    NodePosition,
+    TopologyGraph,
+)
 
 # Three-tier layout:
 # Tier 0 (top):    Gateway (UDM Pro)
@@ -29,7 +36,6 @@ MOCK_NODES: list[NetworkNode] = [
             vuln_high=1,
         ),
     ),
-
     # --- Tier 1: Network infrastructure ---
     NetworkNode(
         id="dev-sw-24",
@@ -72,7 +78,6 @@ MOCK_NODES: list[NetworkNode] = [
             services_count=0,
         ),
     ),
-
     # --- Tier 2: End devices ---
     NetworkNode(
         id="dev-homelab-server",
@@ -202,21 +207,27 @@ MOCK_EDGES: list[NetworkEdge] = [
         source="dev-sw-24",
         target="dev-homelab-server",
         animated=True,
-        data=EdgeData(connection_type="wired", bandwidth_mbps=1000, port_number=1, is_active=True),
+        data=EdgeData(
+            connection_type="wired", bandwidth_mbps=1000, port_number=1, is_active=True
+        ),
     ),
     NetworkEdge(
         id="e-sw24-nas",
         source="dev-sw-24",
         target="dev-nas",
         animated=True,
-        data=EdgeData(connection_type="wired", bandwidth_mbps=1000, port_number=2, is_active=True),
+        data=EdgeData(
+            connection_type="wired", bandwidth_mbps=1000, port_number=2, is_active=True
+        ),
     ),
     NetworkEdge(
         id="e-sw24-unknown",
         source="dev-sw-24",
         target="dev-unknown-01",
         animated=False,
-        data=EdgeData(connection_type="wired", bandwidth_mbps=100, port_number=24, is_active=True),
+        data=EdgeData(
+            connection_type="wired", bandwidth_mbps=100, port_number=24, is_active=True
+        ),
     ),
     # AP → Wireless clients
     NetworkEdge(
@@ -224,14 +235,24 @@ MOCK_EDGES: list[NetworkEdge] = [
         source="dev-ap-lr",
         target="dev-workstation",
         animated=True,
-        data=EdgeData(connection_type="wireless", bandwidth_mbps=600, signal_strength=-55, is_active=True),
+        data=EdgeData(
+            connection_type="wireless",
+            bandwidth_mbps=600,
+            signal_strength=-55,
+            is_active=True,
+        ),
     ),
     NetworkEdge(
         id="e-ap-lr-thermostat",
         source="dev-ap-lr",
         target="dev-iot-thermostat",
         animated=False,
-        data=EdgeData(connection_type="wireless", bandwidth_mbps=54, signal_strength=-68, is_active=True),
+        data=EdgeData(
+            connection_type="wireless",
+            bandwidth_mbps=54,
+            signal_strength=-68,
+            is_active=True,
+        ),
     ),
     # Gateway → Cameras (PoE/separate VLAN)
     NetworkEdge(

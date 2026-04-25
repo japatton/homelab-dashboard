@@ -31,6 +31,7 @@ convert at their boundary.
 Newly-inserted alarms (NOT dedup-merges) fire `alarm:new`. The
 frontend Security page and a badge on the sidebar listen for this.
 """
+
 from __future__ import annotations
 
 import json
@@ -38,7 +39,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Literal, Optional
+from typing import Optional
 
 from database import get_db
 from models.alarm import AlarmSeverity, AlarmSource, AlarmSummary, GatewayAlarm
@@ -52,6 +53,7 @@ class AlarmInput:
     """What an integration hands to the service. Deliberately thin —
     anything source-specific goes into `raw` which we JSON-blob for
     drill-down without committing to a schema."""
+
     source: AlarmSource
     fingerprint: str
     message: str
@@ -90,10 +92,12 @@ async def upsert_alarms(alarms: list[AlarmInput]) -> tuple[int, int]:
             # index makes this cheap. We read before write because
             # SQLite's ON CONFLICT ... DO UPDATE is awkward to combine
             # with our need to know whether this was a create or merge.
-            existing = await (await db.execute(
-                "SELECT id, count FROM gateway_alarms WHERE source = ? AND fingerprint = ?",
-                (a.source, a.fingerprint),
-            )).fetchone()
+            existing = await (
+                await db.execute(
+                    "SELECT id, count FROM gateway_alarms WHERE source = ? AND fingerprint = ?",
+                    (a.source, a.fingerprint),
+                )
+            ).fetchone()
 
             if existing:
                 # Merge: bump count, refresh last_seen, un-dismiss if it
@@ -123,31 +127,44 @@ async def upsert_alarms(alarms: list[AlarmInput]) -> tuple[int, int]:
                         acknowledged, dismissed, raw_json)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 0, ?)""",
                     (
-                        alarm_id, a.source, a.source_label, a.severity,
-                        a.category, a.signature, a.message,
-                        a.src_ip, a.dst_ip, a.device_id, a.device_name,
-                        a.fingerprint, ts, ts, raw_json,
+                        alarm_id,
+                        a.source,
+                        a.source_label,
+                        a.severity,
+                        a.category,
+                        a.signature,
+                        a.message,
+                        a.src_ip,
+                        a.dst_ip,
+                        a.device_id,
+                        a.device_name,
+                        a.fingerprint,
+                        ts,
+                        ts,
+                        raw_json,
                     ),
                 )
                 new_ids.append(alarm_id)
-                new_alarms.append(GatewayAlarm(
-                    id=alarm_id,
-                    source=a.source,
-                    source_label=a.source_label,
-                    severity=a.severity,
-                    category=a.category,
-                    signature=a.signature,
-                    message=a.message,
-                    src_ip=a.src_ip,
-                    dst_ip=a.dst_ip,
-                    device_id=a.device_id,
-                    device_name=a.device_name,
-                    fingerprint=a.fingerprint,
-                    first_seen_at=ts,
-                    last_seen_at=ts,
-                    count=1,
-                    raw=a.raw,
-                ))
+                new_alarms.append(
+                    GatewayAlarm(
+                        id=alarm_id,
+                        source=a.source,
+                        source_label=a.source_label,
+                        severity=a.severity,
+                        category=a.category,
+                        signature=a.signature,
+                        message=a.message,
+                        src_ip=a.src_ip,
+                        dst_ip=a.dst_ip,
+                        device_id=a.device_id,
+                        device_name=a.device_name,
+                        fingerprint=a.fingerprint,
+                        first_seen_at=ts,
+                        last_seen_at=ts,
+                        count=1,
+                        raw=a.raw,
+                    )
+                )
         await db.commit()
 
     # Emit exactly one socket event per genuinely-new alarm. We batch
@@ -161,7 +178,9 @@ async def upsert_alarms(alarms: list[AlarmInput]) -> tuple[int, int]:
 
     log.info(
         "alarms upsert: %d new, %d merged (source=%s)",
-        len(new_ids), updated, alarms[0].source if alarms else "?",
+        len(new_ids),
+        updated,
+        alarms[0].source if alarms else "?",
     )
     return (len(new_ids), updated)
 
@@ -187,10 +206,12 @@ async def list_alarms(
     clause = ("WHERE " + " AND ".join(where)) if where else ""
 
     async with get_db() as db:
-        rows = await (await db.execute(
-            f"SELECT * FROM gateway_alarms {clause} ORDER BY last_seen_at DESC LIMIT ?",
-            (*args, limit),
-        )).fetchall()
+        rows = await (
+            await db.execute(
+                f"SELECT * FROM gateway_alarms {clause} ORDER BY last_seen_at DESC LIMIT ?",
+                (*args, limit),
+            )
+        ).fetchall()
     return [_row_to_alarm(r) for r in rows]
 
 
@@ -201,13 +222,15 @@ async def get_summary() -> AlarmSummary:
     archived, not "unacknowledged but handled".
     """
     async with get_db() as db:
-        rows = await (await db.execute(
-            """SELECT severity, COUNT(*) c,
+        rows = await (
+            await db.execute(
+                """SELECT severity, COUNT(*) c,
                       SUM(CASE WHEN acknowledged = 0 THEN 1 ELSE 0 END) ack
                FROM gateway_alarms
                WHERE dismissed = 0
                GROUP BY severity"""
-        )).fetchall()
+            )
+        ).fetchall()
     out = AlarmSummary()
     for r in rows:
         sev = r["severity"] or "info"

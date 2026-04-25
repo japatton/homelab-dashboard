@@ -31,17 +31,20 @@ def _default_scan_targets() -> list[str]:
         pass
 
     # Last-resort fallback (RFC1918 common default)
-    log.warning("No NMAP_TARGETS or resolvable EXTERNAL_HOST — defaulting to 192.168.1.0/24")
+    log.warning(
+        "No NMAP_TARGETS or resolvable EXTERNAL_HOST — defaulting to 192.168.1.0/24"
+    )
     return ["192.168.1.0/24"]
 
 
-async def nmap_scan_job(targets: list[str] | None = None, profile: str = "standard") -> None:
+async def nmap_scan_job(
+    targets: list[str] | None = None, profile: str = "standard"
+) -> None:
     """Scheduled Nmap scan — discovers/updates all devices and emits topology update."""
     if _MOCK:
         log.debug("nmap_scan_job skipped in MOCK mode")
         return
 
-    from config import get_config_manager
     from integrations.nmap import NmapIntegration
     from services.device_service import merge_nmap_result, detect_unknown_devices
     from services.topology_service import build_topology_graph
@@ -56,7 +59,9 @@ async def nmap_scan_job(targets: list[str] | None = None, profile: str = "standa
         nmap = NmapIntegration()
         result = await nmap.scan(scan_targets, profile=profile)
 
-        await ns.emit_scan_progress(job_id, "nmap", 60, f"Found {len(result.hosts)} hosts")
+        await ns.emit_scan_progress(
+            job_id, "nmap", 60, f"Found {len(result.hosts)} hosts"
+        )
         devices = await merge_nmap_result(result)
 
         await ns.emit_scan_progress(job_id, "nmap", 80, "Building topology")
@@ -71,6 +76,7 @@ async def nmap_scan_job(targets: list[str] | None = None, profile: str = "standa
         if unknown:
             from services.claude_analysis import run_analysis_for_unknown_devices
             from services.background_tasks import spawn
+
             spawn(
                 run_analysis_for_unknown_devices(devices),
                 name="claude_analysis",
@@ -90,6 +96,7 @@ async def nmap_scan_job(targets: list[str] | None = None, profile: str = "standa
         # All ES calls are best-effort — never fail the scan job on ES errors.
         try:
             from integrations.elasticsearch_client import get_es_client
+
             es = get_es_client()
             if es is not None:
                 for d in devices:
@@ -160,7 +167,9 @@ async def unifi_poll_job() -> None:
         await record_job_run("unifi_poll", "success", f"{len(devices)} devices")
 
     except asyncio.TimeoutError:
-        log.warning("unifi_poll_job: fetch_topology timed out after 20s — skipping this run")
+        log.warning(
+            "unifi_poll_job: fetch_topology timed out after 20s — skipping this run"
+        )
         await record_job_run("unifi_poll", "error", "timeout (20s)")
     except Exception as e:
         log.error("unifi_poll_job failed: %s", e)
@@ -193,7 +202,12 @@ async def opnsense_poll_job() -> None:
 
     cfg = get_config_manager().get()
     oc = cfg.opnsense
-    if not oc.enabled or not oc.url or not oc.api_key or not oc.api_secret.get_secret_value():
+    if (
+        not oc.enabled
+        or not oc.url
+        or not oc.api_key
+        or not oc.api_secret.get_secret_value()
+    ):
         # Silent skip: the user hasn't finished wiring this up yet.
         return
 
@@ -210,7 +224,11 @@ async def opnsense_poll_job() -> None:
         # returns in milliseconds.
         snap = await asyncio.wait_for(integ.fetch_snapshot(), timeout=15.0)
 
-        source_label = f"{snap.system.product} {snap.system.version}".strip() if snap.system else "OPNsense"
+        source_label = (
+            f"{snap.system.product} {snap.system.version}".strip()
+            if snap.system
+            else "OPNsense"
+        )
         devices = await merge_gateway_leases(
             source="opnsense",
             source_label=source_label,
@@ -231,26 +249,29 @@ async def opnsense_poll_job() -> None:
                 # 3=warning, 4=notice. Map into our 5-level vocab.
                 sev_map = {1: "critical", 2: "high", 3: "medium", 4: "low"}
                 sev = sev_map.get(a.severity, "info")
-                alarm_inputs.append(AlarmInput(
-                    source="opnsense",
-                    source_label=source_label,
-                    fingerprint=a.fingerprint,
-                    message=a.signature,
-                    severity=sev,   # type: ignore[arg-type]
-                    category=a.category or "ids",
-                    signature=a.signature,
-                    src_ip=a.src_ip,
-                    dst_ip=a.dst_ip,
-                    timestamp=a.timestamp or None,
-                    raw={
-                        "protocol": a.protocol,
-                        "severity_raw": a.severity,
-                    },
-                ))
+                alarm_inputs.append(
+                    AlarmInput(
+                        source="opnsense",
+                        source_label=source_label,
+                        fingerprint=a.fingerprint,
+                        message=a.signature,
+                        severity=sev,  # type: ignore[arg-type]
+                        category=a.category or "ids",
+                        signature=a.signature,
+                        src_ip=a.src_ip,
+                        dst_ip=a.dst_ip,
+                        timestamp=a.timestamp or None,
+                        raw={
+                            "protocol": a.protocol,
+                            "severity_raw": a.severity,
+                        },
+                    )
+                )
             await upsert_alarms(alarm_inputs)
 
         await record_job_run(
-            "opnsense_poll", "success",
+            "opnsense_poll",
+            "success",
             f"{len(snap.leases)} leases, {len(snap.arp)} arp, {len(snap.alerts)} alerts",
         )
 
@@ -306,7 +327,8 @@ async def firewalla_poll_job() -> None:
             # Enabled but credentials missing — tell the user via job
             # state so the Settings UI can surface a "needs config" pill.
             await record_job_run(
-                "firewalla_poll", "error",
+                "firewalla_poll",
+                "error",
                 "integration enabled but no credentials configured",
             )
             return
@@ -329,25 +351,28 @@ async def firewalla_poll_job() -> None:
         if snap.alarms:
             alarm_inputs = []
             for a in snap.alarms:
-                alarm_inputs.append(AlarmInput(
-                    source="firewalla",
-                    source_label=source_label,
-                    fingerprint=a.fingerprint,
-                    message=a.message,
-                    severity=a.severity,
-                    category=a.category or "firewalla",
-                    signature=a.signature,
-                    src_ip=a.src_ip,
-                    dst_ip=a.dst_ip,
-                    device_id=a.device_id,
-                    device_name=a.device_name,
-                    timestamp=a.timestamp,
-                    raw=a.raw,
-                ))
+                alarm_inputs.append(
+                    AlarmInput(
+                        source="firewalla",
+                        source_label=source_label,
+                        fingerprint=a.fingerprint,
+                        message=a.message,
+                        severity=a.severity,
+                        category=a.category or "firewalla",
+                        signature=a.signature,
+                        src_ip=a.src_ip,
+                        dst_ip=a.dst_ip,
+                        device_id=a.device_id,
+                        device_name=a.device_name,
+                        timestamp=a.timestamp,
+                        raw=a.raw,
+                    )
+                )
             await upsert_alarms(alarm_inputs)
 
         await record_job_run(
-            "firewalla_poll", "success",
+            "firewalla_poll",
+            "success",
             f"{len(snap.devices)} devices, {len(snap.alarms)} alarms",
         )
 
@@ -382,7 +407,8 @@ async def latency_poll_job() -> None:
         return
 
     targets = [
-        d for d in devices
+        d
+        for d in devices
         if d.is_online and d.ip and d.device_type in ("gateway", "switch", "ap")
     ]
     if not targets:
@@ -447,6 +473,7 @@ async def openvas_scan_job() -> None:
     # sync NVT feeds. Skip silently if it isn't listening yet instead of
     # spamming 'Connection refused' for every discovered device.
     import asyncio as _asyncio
+
     try:
         _reader, _writer = await _asyncio.wait_for(
             _asyncio.open_connection(cfg.openvas.host, cfg.openvas.port),
@@ -460,7 +487,8 @@ async def openvas_scan_job() -> None:
     except (OSError, _asyncio.TimeoutError) as e:
         log.info("OpenVAS not reachable (%s) — skipping this run; retrying in 5m", e)
         await record_job_run(
-            "openvas_scan", "skipped",
+            "openvas_scan",
+            "skipped",
             f"scanner unreachable: {e} (retry in 5m)",
         )
         # Register a one-off retry so first-boot scanner-warmup (5–10 min
@@ -473,6 +501,7 @@ async def openvas_scan_job() -> None:
         try:
             from apscheduler.triggers.date import DateTrigger
             from scheduler.scheduler import get_scheduler
+
             get_scheduler().add_job(
                 openvas_scan_job,
                 trigger=DateTrigger(
@@ -505,11 +534,17 @@ async def openvas_scan_job() -> None:
         msg = f"{auth.message} (user={cfg.openvas.user!r})"
         log.error("openvas_scan_job aborted: %s", msg)
         await write_audit(
-            "openvas_auth_failed", "scheduler",
-            {"host": cfg.openvas.host, "user": cfg.openvas.user, "reason": auth.message},
+            "openvas_auth_failed",
+            "scheduler",
+            {
+                "host": cfg.openvas.host,
+                "user": cfg.openvas.user,
+                "reason": auth.message,
+            },
         )
         await record_job_run(
-            "openvas_scan", "error",
+            "openvas_scan",
+            "error",
             f"scanner auth failed — fix in Settings: {auth.message}",
         )
         return
@@ -530,7 +565,11 @@ async def openvas_scan_job() -> None:
         except Exception as e:
             log.error("openvas_scan_job device %s failed: %s", device.id, e)
 
-    await record_job_run("openvas_scan", "success", f"{total_findings} findings across {len(online)} devices")
+    await record_job_run(
+        "openvas_scan",
+        "success",
+        f"{total_findings} findings across {len(online)} devices",
+    )
 
 
 async def daily_analysis_job() -> None:

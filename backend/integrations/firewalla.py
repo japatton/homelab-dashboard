@@ -46,6 +46,7 @@ References:
     /v2/alarms, data-models/alarm)
   - github.com/firewalla/msp-api-examples
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -65,37 +66,37 @@ log = logging.getLogger(__name__)
 # code not listed falls back to "info" — better to surface a low-
 # confidence event than drop it silently.
 _ALARM_TYPE_SEVERITY: dict[str, str] = {
-    "1":  "high",      # Security Activity
-    "2":  "medium",    # Abnormal Upload
-    "3":  "low",       # Large Bandwidth Usage
-    "4":  "low",       # Monthly Data Plan
-    "5":  "info",      # New Device
-    "6":  "info",      # Device Back Online
-    "7":  "info",      # Device Offline
-    "8":  "info",      # Video
-    "9":  "info",      # Gaming
-    "10": "medium",    # Porn
-    "11": "info",      # VPN Activity
-    "12": "info",      # VPN Restored
-    "13": "medium",    # VPN Error
-    "14": "medium",    # Open Port
-    "15": "high",      # Internet Connectivity
-    "16": "low",       # Large Upload
+    "1": "high",  # Security Activity
+    "2": "medium",  # Abnormal Upload
+    "3": "low",  # Large Bandwidth Usage
+    "4": "low",  # Monthly Data Plan
+    "5": "info",  # New Device
+    "6": "info",  # Device Back Online
+    "7": "info",  # Device Offline
+    "8": "info",  # Video
+    "9": "info",  # Gaming
+    "10": "medium",  # Porn
+    "11": "info",  # VPN Activity
+    "12": "info",  # VPN Restored
+    "13": "medium",  # VPN Error
+    "14": "medium",  # Open Port
+    "15": "high",  # Internet Connectivity
+    "16": "low",  # Large Upload
 }
 
 # Human-readable labels for the same type codes — surfaced as the
 # alarm category so the Security page can show "Security Activity"
 # instead of an opaque "5".
 _ALARM_TYPE_LABEL: dict[str, str] = {
-    "1":  "Security Activity",
-    "2":  "Abnormal Upload",
-    "3":  "Large Bandwidth Usage",
-    "4":  "Monthly Data Plan",
-    "5":  "New Device",
-    "6":  "Device Back Online",
-    "7":  "Device Offline",
-    "8":  "Video",
-    "9":  "Gaming",
+    "1": "Security Activity",
+    "2": "Abnormal Upload",
+    "3": "Large Bandwidth Usage",
+    "4": "Monthly Data Plan",
+    "5": "New Device",
+    "6": "Device Back Online",
+    "7": "Device Offline",
+    "8": "Video",
+    "9": "Gaming",
     "10": "Porn",
     "11": "VPN Activity",
     "12": "VPN Restored",
@@ -124,7 +125,8 @@ def _type_to_label(type_code) -> str:
 @dataclass
 class FirewallaBox:
     """One Firewalla appliance."""
-    gid: str              # UUID; primary key inside an MSP tenant
+
+    gid: str  # UUID; primary key inside an MSP tenant
     name: str = ""
     model: str = ""
     online: bool = False
@@ -142,15 +144,16 @@ class FirewallaBox:
 @dataclass
 class FirewallaDevice:
     """One LAN device as Firewalla sees it."""
+
     # The MAC address. Firewalla's `id` field IS the MAC (uppercase
     # with colons). We normalise to lowercase to match our devices
     # table's convention and avoid joining mismatches.
     mac: str
     ip: str = ""
     name: str = ""
-    vendor: str = ""          # from macVendor
+    vendor: str = ""  # from macVendor
     online: bool = False
-    gid: str = ""             # which box saw this device
+    gid: str = ""  # which box saw this device
     # Number or string in docs — coerced to float|None at parse time.
     last_seen: Optional[float] = None
     network_name: str = ""
@@ -161,19 +164,20 @@ class FirewallaDevice:
 class FirewallaAlarm:
     """Normalised alarm row, shaped to match the generic
     `AlarmInput` that alarm_service.upsert_alarms consumes."""
-    fingerprint: str           # dedup key: gid|device|type|minute_bucket
+
+    fingerprint: str  # dedup key: gid|device|type|minute_bucket
     message: str
-    severity: str              # our vocab: critical/high/medium/low/info
-    category: str              # human label like "Security Activity"
-    signature: str             # same as category — Firewalla doesn't
-                               # expose a distinct signature string;
-                               # kept separate so the GatewayAlarm
-                               # schema matches OPNsense's shape.
+    severity: str  # our vocab: critical/high/medium/low/info
+    category: str  # human label like "Security Activity"
+    signature: str  # same as category — Firewalla doesn't
+    # expose a distinct signature string;
+    # kept separate so the GatewayAlarm
+    # schema matches OPNsense's shape.
     src_ip: str = ""
     dst_ip: str = ""
-    device_id: Optional[str] = None     # MAC if the alarm was scoped
+    device_id: Optional[str] = None  # MAC if the alarm was scoped
     device_name: str = ""
-    timestamp: Optional[str] = None     # ISO8601; best-effort from ts
+    timestamp: Optional[str] = None  # ISO8601; best-effort from ts
     raw: dict = field(default_factory=dict)
 
 
@@ -186,6 +190,7 @@ class FirewallaSnapshot:
     name; if no boxes come back (shouldn't happen in practice), we
     fall back to "Firewalla".
     """
+
     boxes: list[FirewallaBox] = field(default_factory=list)
     devices: list[FirewallaDevice] = field(default_factory=list)
     alarms: list[FirewallaAlarm] = field(default_factory=list)
@@ -205,6 +210,7 @@ class FirewallaIntegration(BaseIntegration):
     through us, it would fail at this class boundary — no POST/PATCH
     methods exist.
     """
+
     name = "firewalla"
 
     def __init__(
@@ -264,14 +270,20 @@ class FirewallaIntegration(BaseIntegration):
             follow_redirects=True,
         )
 
-    async def _get(self, client: httpx.AsyncClient, path: str, params: Optional[dict] = None) -> dict | list:
-        r = await client.get(f"{self._base_url()}/{path.lstrip('/')}", params=params or None)
+    async def _get(
+        self, client: httpx.AsyncClient, path: str, params: Optional[dict] = None
+    ) -> dict | list:
+        r = await client.get(
+            f"{self._base_url()}/{path.lstrip('/')}", params=params or None
+        )
         # Rate-limit graceful handling: if the server says we're going
         # too fast, log and return an empty result rather than raise.
         # Firewalla doesn't publish hard limits, but a 429 at any rate
         # is a signal to back off rather than retry-hammer.
         if r.status_code == 429:
-            log.warning("firewalla: rate-limited (429) on %s — skipping this fetch", path)
+            log.warning(
+                "firewalla: rate-limited (429) on %s — skipping this fetch", path
+            )
             return []
         r.raise_for_status()
         ct = r.headers.get("content-type", "")
@@ -316,7 +328,8 @@ class FirewallaIntegration(BaseIntegration):
                             "model": b.get("model") or "",
                             "online": bool(b.get("online")),
                         }
-                        for b in boxes if isinstance(b, dict)
+                        for b in boxes
+                        if isinstance(b, dict)
                     ][:5]
                     return ConnectionResult.success(
                         f"Found {len(boxes)} box{'es' if len(boxes) != 1 else ''}",
@@ -345,9 +358,13 @@ class FirewallaIntegration(BaseIntegration):
                     "Authentication failed — check the Personal Access Token "
                     "(MSP portal → Account Settings → Create New Token)."
                 )
-            return ConnectionResult.offline(f"HTTP {e.response.status_code} from Firewalla")
+            return ConnectionResult.offline(
+                f"HTTP {e.response.status_code} from Firewalla"
+            )
         except httpx.ConnectError as e:
-            return ConnectionResult.offline(f"Cannot reach Firewalla: {self._safe_error(e)}")
+            return ConnectionResult.offline(
+                f"Cannot reach Firewalla: {self._safe_error(e)}"
+            )
         except Exception as e:
             return ConnectionResult.offline(self._safe_error(e))
 
@@ -369,18 +386,20 @@ class FirewallaIntegration(BaseIntegration):
             gid = str(r.get("gid") or "").strip()
             if not gid:
                 continue
-            out.append(FirewallaBox(
-                gid=gid,
-                name=str(r.get("name") or "").strip(),
-                model=str(r.get("model") or "").strip(),
-                online=bool(r.get("online")),
-                version=str(r.get("version") or "").strip(),
-                location=str(r.get("location") or "").strip(),
-                last_seen=_coerce_float(r.get("lastSeen")),
-                public_ip=str(r.get("publicIP") or "").strip(),
-                device_count=int(r.get("deviceCount") or 0),
-                alarm_count=int(r.get("alarmCount") or 0),
-            ))
+            out.append(
+                FirewallaBox(
+                    gid=gid,
+                    name=str(r.get("name") or "").strip(),
+                    model=str(r.get("model") or "").strip(),
+                    online=bool(r.get("online")),
+                    version=str(r.get("version") or "").strip(),
+                    location=str(r.get("location") or "").strip(),
+                    last_seen=_coerce_float(r.get("lastSeen")),
+                    public_ip=str(r.get("publicIP") or "").strip(),
+                    device_count=int(r.get("deviceCount") or 0),
+                    alarm_count=int(r.get("alarmCount") or 0),
+                )
+            )
         return out
 
     async def fetch_devices(self, client: httpx.AsyncClient) -> list[FirewallaDevice]:
@@ -403,7 +422,9 @@ class FirewallaIntegration(BaseIntegration):
             try:
                 data = await self._get(client, "devices", params=params)
             except Exception as e:
-                log.debug("firewalla: fetch_devices page failed: %s", self._safe_error(e))
+                log.debug(
+                    "firewalla: fetch_devices page failed: %s", self._safe_error(e)
+                )
                 break
 
             if isinstance(data, dict):
@@ -425,17 +446,23 @@ class FirewallaIntegration(BaseIntegration):
                     continue
                 net = r.get("network") or {}
                 grp = r.get("group") or {}
-                out.append(FirewallaDevice(
-                    mac=mac,
-                    ip=str(r.get("ip") or "").strip(),
-                    name=str(r.get("name") or "").strip(),
-                    vendor=str(r.get("macVendor") or r.get("vendor") or "").strip(),
-                    online=bool(r.get("online")),
-                    gid=str(r.get("gid") or "").strip(),
-                    last_seen=_coerce_float(r.get("lastSeen")),
-                    network_name=str(net.get("name") or "").strip() if isinstance(net, dict) else "",
-                    group_name=str(grp.get("name") or "").strip() if isinstance(grp, dict) else "",
-                ))
+                out.append(
+                    FirewallaDevice(
+                        mac=mac,
+                        ip=str(r.get("ip") or "").strip(),
+                        name=str(r.get("name") or "").strip(),
+                        vendor=str(r.get("macVendor") or r.get("vendor") or "").strip(),
+                        online=bool(r.get("online")),
+                        gid=str(r.get("gid") or "").strip(),
+                        last_seen=_coerce_float(r.get("lastSeen")),
+                        network_name=str(net.get("name") or "").strip()
+                        if isinstance(net, dict)
+                        else "",
+                        group_name=str(grp.get("name") or "").strip()
+                        if isinstance(grp, dict)
+                        else "",
+                    )
+                )
 
             if not cursor:
                 break
@@ -452,7 +479,7 @@ class FirewallaIntegration(BaseIntegration):
         """
         out: list[FirewallaAlarm] = []
         cursor: Optional[str] = None
-        page_cap = 5   # 5 × 200 = 1000 alarms per poll; plenty for a homelab
+        page_cap = 5  # 5 × 200 = 1000 alarms per poll; plenty for a homelab
         for _ in range(page_cap):
             params: dict = {
                 "query": "status:active",
@@ -464,7 +491,9 @@ class FirewallaIntegration(BaseIntegration):
             try:
                 data = await self._get(client, "alarms", params=params)
             except Exception as e:
-                log.debug("firewalla: fetch_alarms page failed: %s", self._safe_error(e))
+                log.debug(
+                    "firewalla: fetch_alarms page failed: %s", self._safe_error(e)
+                )
                 break
 
             if isinstance(data, dict):
@@ -584,7 +613,9 @@ def _parse_alarm(r: dict) -> Optional[FirewallaAlarm]:
     device = r.get("device") if isinstance(r.get("device"), dict) else {}
     remote = r.get("remote") if isinstance(r.get("remote"), dict) else {}
 
-    device_mac = str(device.get("id") or device.get("mac") or "").strip().lower() or None
+    device_mac = (
+        str(device.get("id") or device.get("mac") or "").strip().lower() or None
+    )
     device_name = str(device.get("name") or "").strip()
     src_ip = str(device.get("ip") or "").strip()
     dst_ip = str(remote.get("ip") or remote.get("domain") or "").strip()
@@ -596,6 +627,7 @@ def _parse_alarm(r: dict) -> Optional[FirewallaAlarm]:
     if ts:
         try:
             from datetime import datetime, timezone
+
             dt = datetime.fromtimestamp(float(ts), tz=timezone.utc)
             ts_iso = dt.isoformat()
             ts_bucket = ts_iso[:16]  # YYYY-MM-DDTHH:MM — 1-minute dedup window
@@ -610,7 +642,9 @@ def _parse_alarm(r: dict) -> Optional[FirewallaAlarm]:
     # If message is blank (rare but possible), synthesise one from
     # the label + device name so the Security page always has
     # something renderable.
-    display_message = message or f"{label}: {device_name or device_mac or 'unknown device'}"
+    display_message = (
+        message or f"{label}: {device_name or device_mac or 'unknown device'}"
+    )
 
     return FirewallaAlarm(
         fingerprint=fingerprint,

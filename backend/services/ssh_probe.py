@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Non-interactive SSH auth probe used by the "Test Scan Credentials" button.
 
@@ -21,6 +19,8 @@ The probe is deliberately single-attempt and short-timeout: this runs from a
 user click, not a background job, and we don't want a room full of offline
 hosts to wedge the UI for 30 seconds each.
 """
+
+from __future__ import annotations
 
 import asyncio
 import logging
@@ -49,7 +49,12 @@ class ProbeResult:
         return self.status == "ok"
 
     def to_dict(self) -> dict:
-        return {"ip": self.ip, "status": self.status, "detail": self.detail, "ok": self.ok}
+        return {
+            "ip": self.ip,
+            "status": self.status,
+            "detail": self.detail,
+            "ok": self.ok,
+        }
 
 
 async def probe_ssh(
@@ -94,7 +99,7 @@ async def probe_ssh(
                 username=username,
                 password=password or None,
                 client_keys=client_keys,
-                known_hosts=None,       # homelab — we don't maintain a known_hosts
+                known_hosts=None,  # homelab — we don't maintain a known_hosts
                 preferred_auth=("publickey", "password", "keyboard-interactive"),
                 connect_timeout=PROBE_TIMEOUT,
             ),
@@ -141,7 +146,8 @@ async def probe_many(
     async def _one(ip: str) -> ProbeResult:
         async with sem:
             return await probe_ssh(
-                ip, username,
+                ip,
+                username,
                 password=password,
                 private_key=private_key,
                 key_passphrase=key_passphrase,

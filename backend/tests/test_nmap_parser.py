@@ -12,6 +12,7 @@ Covers:
   - OS fingerprint guess surfaces when present.
   - Empty / malformed XML doesn't crash.
 """
+
 from __future__ import annotations
 
 from integrations.nmap import _parse_xml
@@ -55,7 +56,7 @@ _XML_BASIC = """<?xml version="1.0"?>
 
 def test_parses_up_host_with_ports():
     r = _parse_xml(_XML_BASIC, "nmap -oX - -T4 -sV 192.168.1.0/24")
-    assert len(r.hosts) == 1      # down host skipped
+    assert len(r.hosts) == 1  # down host skipped
     h = r.hosts[0]
     assert h.ip == "192.168.1.50"
     assert h.mac == "AA:BB:CC:DD:EE:FF"
@@ -66,7 +67,7 @@ def test_parses_up_host_with_ports():
 def test_only_open_ports_pass_through():
     r = _parse_xml(_XML_BASIC, "cmd")
     ports = {p.port for p in r.hosts[0].ports}
-    assert ports == {22, 80}      # 9999 closed, dropped
+    assert ports == {22, 80}  # 9999 closed, dropped
 
 
 def test_service_version_concat():

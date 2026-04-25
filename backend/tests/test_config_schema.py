@@ -9,6 +9,7 @@ check:
     accidentally surface a token).
   - poll_interval_seconds bounds are enforced by Field(ge/le).
 """
+
 from __future__ import annotations
 
 import pytest
@@ -34,8 +35,15 @@ class TestDefaults:
         assert root.version == 1
         assert root.setup_complete is False
         for attr in (
-            "unifi", "opnsense", "firewalla", "elasticsearch",
-            "openvas", "scheduler", "proxy", "claude", "ollama",
+            "unifi",
+            "opnsense",
+            "firewalla",
+            "elasticsearch",
+            "openvas",
+            "scheduler",
+            "proxy",
+            "claude",
+            "ollama",
         ):
             assert getattr(root, attr) is not None
 
@@ -73,7 +81,7 @@ class TestMasked:
             api_secret=SecretStr("super-secret-value"),
         )
         m = c.masked()
-        assert m["api_key"] == "k" * 60   # key is semi-public, fine to show
+        assert m["api_key"] == "k" * 60  # key is semi-public, fine to show
         assert m["api_secret"] == "••••••"
         assert "super-secret-value" not in str(m)
 
@@ -177,5 +185,6 @@ class TestLiterals:
 
     def test_proxy_cert_type_literal(self):
         from config.schema import ProxyConfig
+
         with pytest.raises(ValidationError):
             ProxyConfig(cert_type="acme")  # type: ignore[arg-type]

@@ -11,6 +11,7 @@ Key responsibilities:
 Each test function gets a fresh DB (function-scope fixture) so writes in
 one test never leak into another.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -59,6 +60,7 @@ async def initialised_db(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # var we just set. Otherwise the module would keep whatever value
     # was present at first import time.
     import database
+
     importlib.reload(database)
     assert database.DB_PATH == p, "database.DB_PATH did not pick up the monkeypatch"
 
@@ -80,6 +82,7 @@ def config_manager(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CONFIG_PATH", str(cfg_path))
 
     from config import config_manager as cm_mod
+
     importlib.reload(cm_mod)
 
     mgr = cm_mod.ConfigManager(cfg_path)
@@ -106,6 +109,7 @@ def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     from fastapi.testclient import TestClient
     import main
+
     importlib.reload(main)
 
     with TestClient(main.app) as c:
@@ -122,6 +126,7 @@ def api_client_with_token(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
     from fastapi.testclient import TestClient
     import main
+
     importlib.reload(main)
 
     with TestClient(main.app) as c:

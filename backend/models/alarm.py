@@ -10,6 +10,7 @@ Severity is normalised to the Nmap/OpenVAS vocabulary (critical /
 high / medium / low / info) so the frontend's severity palette works
 uniformly across all feeds.
 """
+
 from __future__ import annotations
 
 from typing import Literal, Optional
@@ -23,6 +24,7 @@ AlarmSeverity = Literal["critical", "high", "medium", "low", "info"]
 
 class GatewayAlarm(BaseModel):
     """Single alarm entry, mapped 1:1 to gateway_alarms table."""
+
     id: str
     source: AlarmSource
     source_label: str = ""
@@ -52,6 +54,7 @@ class GatewayAlarm(BaseModel):
 class AlarmSummary(BaseModel):
     """Counts-by-severity payload used for badges and the Security
     page header. Cheap to compute via a single GROUP BY query."""
+
     total: int = 0
     unacknowledged: int = 0
     critical: int = 0

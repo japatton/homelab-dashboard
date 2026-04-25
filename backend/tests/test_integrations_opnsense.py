@@ -12,6 +12,7 @@ Focus:
   - Alert fingerprint determinism (dedup depends on it being stable).
   - test_connection status-code discrimination (401 → auth-error message).
 """
+
 from __future__ import annotations
 
 import httpx
@@ -19,9 +20,7 @@ import pytest
 import respx
 
 from integrations.opnsense import (
-    OPNsenseAlert,
     OPNsenseIntegration,
-    OPNsenseLease,
 )
 
 
@@ -48,7 +47,9 @@ class TestLeaseParsing:
                 200,
                 headers={"content-type": "application/json"},
                 json={
-                    "total": 2, "rowCount": 2, "current": 1,
+                    "total": 2,
+                    "rowCount": 2,
+                    "current": 1,
                     "rows": [
                         {
                             "address": "10.0.0.50",
@@ -73,7 +74,7 @@ class TestLeaseParsing:
         async with _integ()._client() as c:
             leases = await _integ().fetch_leases(c)
         assert len(leases) == 2
-        assert leases[0].mac == "aa:bb:cc:dd:ee:ff"   # lowercased
+        assert leases[0].mac == "aa:bb:cc:dd:ee:ff"  # lowercased
         assert leases[0].hostname == "raspberry"
         assert leases[0].description == "Pi hole"
         assert leases[0].interface == "em1"
@@ -82,14 +83,18 @@ class TestLeaseParsing:
     @respx.mock
     async def test_skips_rows_without_mac_or_ip(self):
         respx.get(f"{_URL}/api/dhcpv4/leases/search_lease").mock(
-            return_value=httpx.Response(200, headers={"content-type": "application/json"}, json={
-                "rows": [
-                    {"address": "", "mac": ""},           # both blank
-                    {"address": "10.0.0.10"},             # missing mac
-                    {"mac": "aa:bb:cc:00:00:01"},         # missing ip
-                    {"address": "10.0.0.11", "mac": "aa:bb:cc:00:00:02"},
-                ],
-            })
+            return_value=httpx.Response(
+                200,
+                headers={"content-type": "application/json"},
+                json={
+                    "rows": [
+                        {"address": "", "mac": ""},  # both blank
+                        {"address": "10.0.0.10"},  # missing mac
+                        {"mac": "aa:bb:cc:00:00:01"},  # missing ip
+                        {"address": "10.0.0.11", "mac": "aa:bb:cc:00:00:02"},
+                    ],
+                },
+            )
         )
         async with _integ()._client() as c:
             leases = await _integ().fetch_leases(c)
@@ -103,8 +108,11 @@ class TestLeaseParsing:
         )
         respx.get(f"{_URL}/api/kea/leases4/search").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
-                json={"rows": [{"ip_address": "10.0.0.60", "hwaddr": "aa:bb:cc:00:00:03"}]},
+                200,
+                headers={"content-type": "application/json"},
+                json={
+                    "rows": [{"ip_address": "10.0.0.60", "hwaddr": "aa:bb:cc:00:00:03"}]
+                },
             )
         )
         async with _integ()._client() as c:
@@ -120,9 +128,15 @@ class TestArpEndpointFallback:
         # 25.7+ path works → we never reach the legacy alias.
         respx.get(f"{_URL}/api/diagnostics/interface/get_arp").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
+                200,
+                headers={"content-type": "application/json"},
                 json=[
-                    {"mac": "AA:BB:CC:00:00:10", "ip": "10.0.0.10", "intf": "LAN", "permanent": "no"},
+                    {
+                        "mac": "AA:BB:CC:00:00:10",
+                        "ip": "10.0.0.10",
+                        "intf": "LAN",
+                        "permanent": "no",
+                    },
                 ],
             )
         )
@@ -140,7 +154,8 @@ class TestArpEndpointFallback:
         )
         respx.get(f"{_URL}/api/diagnostics/interface/getArp").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
+                200,
+                headers={"content-type": "application/json"},
                 json=[{"mac_address": "aa:bb:cc:00:00:11", "ip_address": "10.0.0.11"}],
             )
         )
@@ -167,22 +182,25 @@ class TestAlertParsing:
     async def test_parses_eve_style_alert(self):
         respx.post(f"{_URL}/api/ids/service/query_alerts").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
-                json={"rows": [
-                    {
-                        "_source": {
-                            "timestamp": "2026-04-21T18:40:12.123456+0000",
-                            "src_ip": "192.168.1.50",
-                            "dest_ip": "1.1.1.1",
-                            "proto": "TCP",
-                            "alert": {
-                                "signature": "ET TROJAN Possible Emotet HTTP",
-                                "category": "A Network Trojan was detected",
-                                "severity": 1,
+                200,
+                headers={"content-type": "application/json"},
+                json={
+                    "rows": [
+                        {
+                            "_source": {
+                                "timestamp": "2026-04-21T18:40:12.123456+0000",
+                                "src_ip": "192.168.1.50",
+                                "dest_ip": "1.1.1.1",
+                                "proto": "TCP",
+                                "alert": {
+                                    "signature": "ET TROJAN Possible Emotet HTTP",
+                                    "category": "A Network Trojan was detected",
+                                    "severity": 1,
+                                },
                             },
                         },
-                    },
-                ]},
+                    ]
+                },
             )
         )
         async with _integ()._client() as c:
@@ -194,21 +212,32 @@ class TestAlertParsing:
         assert a.dst_ip == "1.1.1.1"
         assert a.severity == 1
         # Fingerprint shape: src|dst|sig|minute_bucket (YYYY-MM-DDTHH:MM)
-        assert a.fingerprint == "192.168.1.50|1.1.1.1|ET TROJAN Possible Emotet HTTP|2026-04-21T18:40"
+        assert (
+            a.fingerprint
+            == "192.168.1.50|1.1.1.1|ET TROJAN Possible Emotet HTTP|2026-04-21T18:40"
+        )
 
     @respx.mock
     async def test_alert_fingerprint_is_deterministic(self):
         # Same input → same fingerprint (required for dedup to work).
-        payload = {"rows": [
-            {
-                "timestamp": "2026-04-21T18:40:12.123+0000",
-                "src_ip": "192.168.1.50",
-                "dest_ip": "1.1.1.1",
-                "alert": {"signature": "ET TROJAN Test", "severity": 2, "category": "Trojan"},
-            },
-        ]}
+        payload = {
+            "rows": [
+                {
+                    "timestamp": "2026-04-21T18:40:12.123+0000",
+                    "src_ip": "192.168.1.50",
+                    "dest_ip": "1.1.1.1",
+                    "alert": {
+                        "signature": "ET TROJAN Test",
+                        "severity": 2,
+                        "category": "Trojan",
+                    },
+                },
+            ]
+        }
         respx.post(f"{_URL}/api/ids/service/query_alerts").mock(
-            return_value=httpx.Response(200, headers={"content-type": "application/json"}, json=payload)
+            return_value=httpx.Response(
+                200, headers={"content-type": "application/json"}, json=payload
+            )
         )
         async with _integ()._client() as c:
             a1 = await _integ().fetch_alerts(c)
@@ -219,12 +248,23 @@ class TestAlertParsing:
     async def test_alert_skips_blank_signature(self):
         respx.post(f"{_URL}/api/ids/service/query_alerts").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
-                json={"rows": [
-                    {"alert": {"signature": ""}, "src_ip": "1.1.1.1", "dest_ip": "2.2.2.2"},
-                    {"alert": {"signature": "valid"}, "src_ip": "1.1.1.1", "dest_ip": "2.2.2.2",
-                     "timestamp": "2026-04-21T18:40+00:00"},
-                ]},
+                200,
+                headers={"content-type": "application/json"},
+                json={
+                    "rows": [
+                        {
+                            "alert": {"signature": ""},
+                            "src_ip": "1.1.1.1",
+                            "dest_ip": "2.2.2.2",
+                        },
+                        {
+                            "alert": {"signature": "valid"},
+                            "src_ip": "1.1.1.1",
+                            "dest_ip": "2.2.2.2",
+                            "timestamp": "2026-04-21T18:40+00:00",
+                        },
+                    ]
+                },
             )
         )
         async with _integ()._client() as c:
@@ -275,13 +315,15 @@ class TestTestConnection:
     async def test_success_surfaces_product_version(self):
         respx.get(f"{_URL}/api/core/firmware/status").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
+                200,
+                headers={"content-type": "application/json"},
                 json={"product_name": "OPNsense", "product_version": "24.7.4"},
             )
         )
         respx.get(f"{_URL}/api/diagnostics/system/system_information").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
+                200,
+                headers={"content-type": "application/json"},
                 json={"name": "fw01", "versions": {"product_version": "24.7.4"}},
             )
         )

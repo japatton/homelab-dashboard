@@ -41,6 +41,7 @@ and the secret goes in the password slot.
    in the static mappings table) so the merger can prefer the
    descr-over-hostname-over-nothing precedence.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -68,6 +69,7 @@ class OPNsenseLease:
     being a bool. DHCP responses are surprisingly inconsistent across
     OPNsense versions on that front.
     """
+
     address: str
     mac: str
     hostname: Optional[str] = None
@@ -100,6 +102,7 @@ class OPNsenseArpEntry:
     versions (some return `mac` / `ip`, others `mac_address` /
     `ip_address`), so we normalise at parse time.
     """
+
     mac: str
     ip: str
     hostname: Optional[str] = None
@@ -117,11 +120,12 @@ class OPNsenseAlert:
     the generic shape in the poller rather than here so the integration
     layer stays source-faithful.
     """
-    timestamp: str           # ISO8601; best-effort parsed from raw
+
+    timestamp: str  # ISO8601; best-effort parsed from raw
     src_ip: str
     dst_ip: str
     signature: str
-    severity: int            # 1 (critical) … 3 (informational) per Suricata
+    severity: int  # 1 (critical) … 3 (informational) per Suricata
     category: str = ""
     protocol: str = ""
     # Opaque fingerprint for dedup — we build it from src+dst+sig+minute
@@ -133,6 +137,7 @@ class OPNsenseAlert:
 @dataclass
 class OPNsenseSystemInfo:
     """High-level box info shown on the gateway card."""
+
     hostname: str = ""
     version: str = ""
     # `name` is what OPNsense calls the pretty product string
@@ -146,6 +151,7 @@ class OPNsenseSnapshot:
     """One poll cycle's worth of data. Passed whole into the merger so
     we get atomic updates — a half-updated state (leases refreshed but
     ARP not) is worse than a slightly stale consistent view."""
+
     leases: list[OPNsenseLease] = field(default_factory=list)
     arp: list[OPNsenseArpEntry] = field(default_factory=list)
     alerts: list[OPNsenseAlert] = field(default_factory=list)
@@ -163,6 +169,7 @@ class OPNsenseIntegration(BaseIntegration):
     that could be misused via prompt injection upstream. All methods
     are read-only.
     """
+
     name = "opnsense"
 
     def __init__(
@@ -218,7 +225,9 @@ class OPNsenseIntegration(BaseIntegration):
         return both ok/notok AND a detail payload the UI can render
         for a friendly confirmation ("OPNsense 24.7.4 · hostname=fw01")."""
         if not self._url or not self._api_key or not self._api_secret:
-            return ConnectionResult.offline("URL, API key, and API secret are all required")
+            return ConnectionResult.offline(
+                "URL, API key, and API secret are all required"
+            )
         try:
             async with self._client() as c:
                 data = await self._get(c, "core/firmware/status")
@@ -226,14 +235,22 @@ class OPNsenseIntegration(BaseIntegration):
                 # not strictly required; if it fails we still consider
                 # the connection OK.
                 try:
-                    sysinfo = await self._get(c, "diagnostics/system/system_information")
+                    sysinfo = await self._get(
+                        c, "diagnostics/system/system_information"
+                    )
                     hostname = sysinfo.get("name") or sysinfo.get("hostname") or ""
-                    version = sysinfo.get("versions", {}).get("product_version") or sysinfo.get("version") or ""
+                    version = (
+                        sysinfo.get("versions", {}).get("product_version")
+                        or sysinfo.get("version")
+                        or ""
+                    )
                 except Exception as sysinfo_err:
                     # Optional endpoint — older firmware (pre-21.x) returns
                     # 404 here. The primary probe already succeeded, so we
                     # downgrade to a debug log rather than fail the test.
-                    log.debug("opnsense sysinfo lookup failed (non-fatal): %s", sysinfo_err)
+                    log.debug(
+                        "opnsense sysinfo lookup failed (non-fatal): %s", sysinfo_err
+                    )
                     hostname = ""
                     version = ""
                 product_name = data.get("product_name") or "OPNsense"
@@ -254,9 +271,13 @@ class OPNsenseIntegration(BaseIntegration):
                     "Authentication failed — check the API key and secret "
                     "(System → Access → Users → [user] → API keys)."
                 )
-            return ConnectionResult.offline(f"HTTP {e.response.status_code} from firewall")
+            return ConnectionResult.offline(
+                f"HTTP {e.response.status_code} from firewall"
+            )
         except httpx.ConnectError as e:
-            return ConnectionResult.offline(f"Cannot reach firewall: {self._safe_error(e)}")
+            return ConnectionResult.offline(
+                f"Cannot reach firewall: {self._safe_error(e)}"
+            )
         except Exception as e:
             return ConnectionResult.offline(self._safe_error(e))
 
@@ -296,22 +317,28 @@ class OPNsenseIntegration(BaseIntegration):
             if not isinstance(r, dict):
                 continue
             mac = (r.get("mac") or r.get("hwaddr") or "").strip().lower()
-            address = (r.get("address") or r.get("ip_address") or r.get("ip") or "").strip()
+            address = (
+                r.get("address") or r.get("ip_address") or r.get("ip") or ""
+            ).strip()
             if not mac or not address:
                 # Without both we can't key a device; skip rather than
                 # creating half-useful rows that'd confuse the merger.
                 continue
-            out.append(OPNsenseLease(
-                address=address,
-                mac=mac,
-                hostname=(r.get("hostname") or "").strip() or None,
-                state=(r.get("state") or "").strip(),
-                status=(r.get("status") or "").strip(),
-                description=(r.get("descr") or r.get("description") or "").strip(),
-                interface=(r.get("if") or r.get("interface") or "").strip(),
-                interface_description=(r.get("if_descr") or r.get("interface_description") or "").strip(),
-                manufacturer=(r.get("man") or r.get("manufacturer") or "").strip(),
-            ))
+            out.append(
+                OPNsenseLease(
+                    address=address,
+                    mac=mac,
+                    hostname=(r.get("hostname") or "").strip() or None,
+                    state=(r.get("state") or "").strip(),
+                    status=(r.get("status") or "").strip(),
+                    description=(r.get("descr") or r.get("description") or "").strip(),
+                    interface=(r.get("if") or r.get("interface") or "").strip(),
+                    interface_description=(
+                        r.get("if_descr") or r.get("interface_description") or ""
+                    ).strip(),
+                    manufacturer=(r.get("man") or r.get("manufacturer") or "").strip(),
+                )
+            )
         return out
 
     async def fetch_arp(self, client: httpx.AsyncClient) -> list[OPNsenseArpEntry]:
@@ -351,17 +378,23 @@ class OPNsenseIntegration(BaseIntegration):
             # versions and booleans on others. Defensive coercion.
             perm = r.get("permanent") or r.get("is_permanent")
             exp = r.get("expired") or r.get("is_expired")
-            out.append(OPNsenseArpEntry(
-                mac=mac,
-                ip=ip,
-                hostname=(r.get("hostname") or "").strip() or None,
-                interface=(r.get("intf") or r.get("interface") or r.get("if_descr") or "").strip(),
-                permanent=(str(perm).lower() in ("yes", "true", "1")),
-                expired=(str(exp).lower() in ("yes", "true", "1")),
-            ))
+            out.append(
+                OPNsenseArpEntry(
+                    mac=mac,
+                    ip=ip,
+                    hostname=(r.get("hostname") or "").strip() or None,
+                    interface=(
+                        r.get("intf") or r.get("interface") or r.get("if_descr") or ""
+                    ).strip(),
+                    permanent=(str(perm).lower() in ("yes", "true", "1")),
+                    expired=(str(exp).lower() in ("yes", "true", "1")),
+                )
+            )
         return out
 
-    async def fetch_system_info(self, client: httpx.AsyncClient) -> Optional[OPNsenseSystemInfo]:
+    async def fetch_system_info(
+        self, client: httpx.AsyncClient
+    ) -> Optional[OPNsenseSystemInfo]:
         """GET /api/diagnostics/system/system_information
 
         Best-effort — this endpoint changed shape between 22.x and
@@ -371,11 +404,15 @@ class OPNsenseIntegration(BaseIntegration):
         try:
             data = await self._get(client, "diagnostics/system/system_information")
         except Exception as e:
-            log.debug("opnsense: system_information fetch failed: %s", self._safe_error(e))
+            log.debug(
+                "opnsense: system_information fetch failed: %s", self._safe_error(e)
+            )
             return None
 
         hostname = (data.get("name") or data.get("hostname") or "").strip()
-        versions = data.get("versions") if isinstance(data.get("versions"), dict) else {}
+        versions = (
+            data.get("versions") if isinstance(data.get("versions"), dict) else {}
+        )
         version = (
             (versions.get("product_version") if versions else None)
             or data.get("version")
@@ -392,7 +429,9 @@ class OPNsenseIntegration(BaseIntegration):
             product=str(product).strip(),
         )
 
-    async def fetch_alerts(self, client: httpx.AsyncClient, limit: int = 100) -> list[OPNsenseAlert]:
+    async def fetch_alerts(
+        self, client: httpx.AsyncClient, limit: int = 100
+    ) -> list[OPNsenseAlert]:
         """POST /api/ids/service/query_alerts — Suricata alert log.
 
         Only called when `ids_enabled=True` in config because the
@@ -425,7 +464,9 @@ class OPNsenseIntegration(BaseIntegration):
                 # IDS plugin not installed; not an error from our
                 # perspective — just nothing to fetch.
                 return []
-            log.debug("opnsense: IDS alert fetch failed: HTTP %d", e.response.status_code)
+            log.debug(
+                "opnsense: IDS alert fetch failed: HTTP %d", e.response.status_code
+            )
             return []
         except Exception as e:
             log.debug("opnsense: IDS alert fetch failed: %s", self._safe_error(e))
@@ -446,7 +487,9 @@ class OPNsenseIntegration(BaseIntegration):
             ts = str(src.get("timestamp") or r.get("timestamp") or "")
             src_ip = str(src.get("src_ip") or src.get("src") or "").strip()
             dst_ip = str(src.get("dest_ip") or src.get("dst") or "").strip()
-            signature = str(alert.get("signature") or src.get("signature") or "").strip()
+            signature = str(
+                alert.get("signature") or src.get("signature") or ""
+            ).strip()
             severity = int(alert.get("severity") or src.get("severity") or 3)
             category = str(alert.get("category") or src.get("category") or "").strip()
             protocol = str(src.get("proto") or src.get("protocol") or "").strip()
@@ -459,16 +502,18 @@ class OPNsenseIntegration(BaseIntegration):
             # identical fingerprints as updates, not new events.
             ts_bucket = ts[:16]  # YYYY-MM-DDTHH:MM
             fingerprint = f"{src_ip}|{dst_ip}|{signature}|{ts_bucket}"
-            out.append(OPNsenseAlert(
-                timestamp=ts,
-                src_ip=src_ip,
-                dst_ip=dst_ip,
-                signature=signature,
-                severity=severity,
-                category=category,
-                protocol=protocol,
-                fingerprint=fingerprint,
-            ))
+            out.append(
+                OPNsenseAlert(
+                    timestamp=ts,
+                    src_ip=src_ip,
+                    dst_ip=dst_ip,
+                    signature=signature,
+                    severity=severity,
+                    category=category,
+                    protocol=protocol,
+                    fingerprint=fingerprint,
+                )
+            )
         return out
 
     async def fetch_snapshot(self) -> OPNsenseSnapshot:

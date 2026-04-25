@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Recreate the `homelab-openvas` container with a new admin password.
 
@@ -36,6 +34,8 @@ on a fixed name (`OPENVAS_CONTAINER_NAME`) so a compromised Settings form
 can't redirect the wipe at an unrelated container.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from typing import Optional
@@ -52,8 +52,8 @@ log = logging.getLogger(__name__)
 # service or the project, update these constants.
 OPENVAS_CONTAINER_NAME = "homelab-openvas"
 OPENVAS_VOLUME_NAMES = (
-    "homelab-dashboard_openvas-data",   # new pinned project name
-    "passwordmanager_openvas-data",     # fallback for pre-pin deployments
+    "homelab-dashboard_openvas-data",  # new pinned project name
+    "passwordmanager_openvas-data",  # fallback for pre-pin deployments
 )
 
 # How long to wait for gvmd to come up and accept the new password.
@@ -79,12 +79,15 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
     """
     ns = get_notification_service()
 
-    async def emit(stage: str, percent: int, message: str, error: Optional[str] = None) -> None:
+    async def emit(
+        stage: str, percent: int, message: str, error: Optional[str] = None
+    ) -> None:
         log.info("openvas_reset: %s (%d%%) %s", stage, percent, message)
         await ns.emit_openvas_reset(stage, percent, message, error)
 
     await write_audit(
-        "reset_openvas_start", "user",
+        "reset_openvas_start",
+        "user",
         {"container": OPENVAS_CONTAINER_NAME, "username": username},
     )
 
@@ -93,6 +96,7 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
         # library is synchronous. Keeping them off the event loop means
         # socket.io can still flush progress events in parallel.
         import docker  # lazy — only imported when the user actually resets
+
         try:
             client = docker.from_env()
             client.ping()
@@ -105,7 +109,9 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
 
         # ── 1. Capture current container config so we can recreate it ──
         await emit("stopping", 5, f"locating {OPENVAS_CONTAINER_NAME}")
-        container = await asyncio.to_thread(_get_container, client, OPENVAS_CONTAINER_NAME)
+        container = await asyncio.to_thread(
+            _get_container, client, OPENVAS_CONTAINER_NAME
+        )
         if container is None:
             raise ResetError(
                 f"container {OPENVAS_CONTAINER_NAME!r} not found. "
@@ -120,7 +126,9 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
 
         # ── 3. Wipe the named volume ──
         await emit("wiping", 30, "removing openvas-data volume")
-        removed = await asyncio.to_thread(_remove_first_matching_volume, client, OPENVAS_VOLUME_NAMES)
+        removed = await asyncio.to_thread(
+            _remove_first_matching_volume, client, OPENVAS_VOLUME_NAMES
+        )
         if removed:
             await emit("wiping", 35, f"removed volume {removed}")
         else:
@@ -133,8 +141,9 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
         new_container = await asyncio.to_thread(
             _recreate_with_password, client, config, username, new_password
         )
-        await emit("starting", 50,
-                   f"container {new_container.name} started — waiting for gvmd")
+        await emit(
+            "starting", 50, f"container {new_container.name} started — waiting for gvmd"
+        )
 
         # ── 5. Poll authenticate() until gvmd accepts the new password ──
         host = _infer_openvas_host(config)
@@ -144,6 +153,7 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
         # ── 6. Persist the new creds now that we know they work ──
         from config import get_config_manager
         from pydantic import SecretStr
+
         mgr = get_config_manager()
         cfg = mgr.get()
         cfg.openvas.user = username
@@ -152,14 +162,16 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
 
         await emit("ready", 100, f"authenticated as {username}")
         await write_audit(
-            "reset_openvas_success", "user",
+            "reset_openvas_success",
+            "user",
             {"container": OPENVAS_CONTAINER_NAME, "username": username},
         )
 
     except ResetError as e:
         await emit("error", 0, str(e), error=str(e))
         await write_audit(
-            "reset_openvas_failed", "user",
+            "reset_openvas_failed",
+            "user",
             {"container": OPENVAS_CONTAINER_NAME, "reason": str(e)},
         )
     except Exception as e:
@@ -168,7 +180,8 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
         msg = f"{type(e).__name__}: {e}"
         await emit("error", 0, msg, error=msg)
         await write_audit(
-            "reset_openvas_failed", "user",
+            "reset_openvas_failed",
+            "user",
             {"container": OPENVAS_CONTAINER_NAME, "reason": msg},
         )
 
@@ -178,6 +191,7 @@ async def reset_openvas_password(new_password: str, username: str = "admin") -> 
 
 def _get_container(client, name: str):
     import docker.errors
+
     try:
         return client.containers.get(name)
     except docker.errors.NotFound:
@@ -207,7 +221,9 @@ def _snapshot_config(container) -> dict:
         # Docker auto-adds the short container id as an alias — keeping it
         # is harmless but noisy; drop it so the re-attach only adds the
         # meaningful aliases (service name + container_name).
-        aliases = [a for a in aliases if a and not _looks_like_short_id(a, container.id)]
+        aliases = [
+            a for a in aliases if a and not _looks_like_short_id(a, container.id)
+        ]
         if aliases:
             network_aliases[net_name] = aliases
     return {
@@ -246,8 +262,11 @@ def _stop_and_remove(container) -> None:
         raise ResetError(f"could not remove container: {e}") from e
 
 
-def _remove_first_matching_volume(client, candidate_names: tuple[str, ...]) -> Optional[str]:
+def _remove_first_matching_volume(
+    client, candidate_names: tuple[str, ...]
+) -> Optional[str]:
     import docker.errors
+
     for name in candidate_names:
         try:
             vol = client.volumes.get(name)
@@ -267,7 +286,8 @@ def _recreate_with_password(client, config: dict, username: str, password: str):
     missing). Everything else — ports, bindings, labels, network, restart
     policy — is preserved bit-for-bit."""
     env_no_creds = [
-        e for e in config["env"]
+        e
+        for e in config["env"]
         if not (e.startswith("USERNAME=") or e.startswith("PASSWORD="))
     ]
     env_no_creds.append(f"USERNAME={username}")
@@ -320,7 +340,9 @@ def _recreate_with_password(client, config: dict, username: str, password: str):
             try:
                 client.networks.get(net).connect(container, aliases=aliases or None)
             except Exception as e:
-                log.warning("could not attach network %s (aliases=%s): %s", net, aliases, e)
+                log.warning(
+                    "could not attach network %s (aliases=%s): %s", net, aliases, e
+                )
         container.start()
     else:
         # No captured networks — fall back to the simple run path. Shouldn't
@@ -353,7 +375,9 @@ def _infer_openvas_port(config: dict) -> int:
     return 9390
 
 
-async def _wait_for_gvmd_auth(host: str, port: int, username: str, password: str, emit) -> None:
+async def _wait_for_gvmd_auth(
+    host: str, port: int, username: str, password: str, emit
+) -> None:
     """Poll GMP authenticate() until it succeeds or we time out.
 
     The timeout is intentionally long (15 min): on a fresh NVT sync the
@@ -381,7 +405,9 @@ async def _wait_for_gvmd_auth(host: str, port: int, username: str, password: str
                 f"minutes — last response: {last_reason or 'unknown'}"
             )
 
-        integ = OpenVASIntegration(host=host, port=port, username=username, password=password)
+        integ = OpenVASIntegration(
+            host=host, port=port, username=username, password=password
+        )
         res = await integ.test_connection()
         if res.ok:
             return
@@ -394,7 +420,8 @@ async def _wait_for_gvmd_auth(host: str, port: int, username: str, password: str
         mins = int(remaining // 60)
         secs = int(remaining % 60)
         await emit(
-            "warmup", pct,
+            "warmup",
+            pct,
             f"gvmd warming up ({last_reason}) — up to {mins:d}:{secs:02d} remaining",
         )
         await asyncio.sleep(WARMUP_POLL_SECONDS)

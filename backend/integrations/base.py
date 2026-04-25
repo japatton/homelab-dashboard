@@ -8,13 +8,13 @@ IntegrationStatus = Literal["ok", "degraded", "offline"]
 
 # Patterns that look like credentials in error messages
 _CREDENTIAL_RE = re.compile(
-    r'(password|passwd|token|secret|key|auth)[=:]\S+',
+    r"(password|passwd|token|secret|key|auth)[=:]\S+",
     re.IGNORECASE,
 )
 
 
 def _sanitize_error(msg: str) -> str:
-    return _CREDENTIAL_RE.sub(r'\1=***', msg)
+    return _CREDENTIAL_RE.sub(r"\1=***", msg)
 
 
 @dataclass
@@ -31,11 +31,15 @@ class ConnectionResult:
 
     @classmethod
     def degraded(cls, message: str = "", **detail) -> "ConnectionResult":
-        return cls(ok=False, status="degraded", message=_sanitize_error(message), detail=detail)
+        return cls(
+            ok=False, status="degraded", message=_sanitize_error(message), detail=detail
+        )
 
     @classmethod
     def offline(cls, message: str = "", **detail) -> "ConnectionResult":
-        return cls(ok=False, status="offline", message=_sanitize_error(message), detail=detail)
+        return cls(
+            ok=False, status="offline", message=_sanitize_error(message), detail=detail
+        )
 
 
 class BaseIntegration:

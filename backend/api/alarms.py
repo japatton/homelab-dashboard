@@ -19,6 +19,7 @@ Design notes:
     and matches the "Archive" button's "clear what's been dismissed"
     semantics.
 """
+
 from __future__ import annotations
 
 import os
@@ -173,7 +174,9 @@ async def list_all(
         return {"alarms": rows[:limit]}
 
     src: Optional[AlarmSource] = source if source in ("opnsense", "firewalla") else None  # type: ignore[assignment]
-    sev: Optional[AlarmSeverity] = severity if severity in ("critical", "high", "medium", "low", "info") else None  # type: ignore[assignment]
+    sev: Optional[AlarmSeverity] = (
+        severity if severity in ("critical", "high", "medium", "low", "info") else None
+    )  # type: ignore[assignment]
     alarms = await list_alarms(
         limit=limit,
         include_dismissed=include_dismissed,

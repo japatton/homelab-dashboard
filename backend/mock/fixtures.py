@@ -17,7 +17,13 @@ MOCK_DEVICES: list[Device] = [
         confidence=1.0,
         is_online=True,
         services=[
-            DeviceService(port=443, protocol="tcp", name="https", version="UniFi OS 3.x", launch_url="https://192.168.1.1"),
+            DeviceService(
+                port=443,
+                protocol="tcp",
+                name="https",
+                version="UniFi OS 3.x",
+                launch_url="https://192.168.1.1",
+            ),
             DeviceService(port=22, protocol="tcp", name="ssh", version="OpenSSH 8.x"),
         ],
         vuln_summary=VulnSummary(critical=0, high=1, medium=2, low=3),
@@ -36,7 +42,9 @@ MOCK_DEVICES: list[Device] = [
         confidence=1.0,
         is_online=True,
         services=[
-            DeviceService(port=443, protocol="tcp", name="https", launch_url="https://192.168.1.2"),
+            DeviceService(
+                port=443, protocol="tcp", name="https", launch_url="https://192.168.1.2"
+            ),
         ],
         vuln_summary=VulnSummary(critical=0, high=0, medium=1, low=2),
         first_seen=NOW - timedelta(days=300),
@@ -57,7 +65,12 @@ MOCK_DEVICES: list[Device] = [
         vuln_summary=VulnSummary(),
         first_seen=NOW - timedelta(days=200),
         last_seen=NOW - timedelta(seconds=45),
-        metadata={"model": "UAP-U6-LR", "unifi_managed": True, "channel_2g": 6, "channel_5g": 36},
+        metadata={
+            "model": "UAP-U6-LR",
+            "unifi_managed": True,
+            "channel_2g": 6,
+            "channel_5g": 36,
+        },
     ),
     Device(
         id="dev-ap-office",
@@ -87,8 +100,16 @@ MOCK_DEVICES: list[Device] = [
         is_online=True,
         services=[
             DeviceService(port=22, protocol="tcp", name="ssh", version="OpenSSH 9.x"),
-            DeviceService(port=2375, protocol="tcp", name="docker", version="Docker 24.x"),
-            DeviceService(port=8080, protocol="tcp", name="http", version="Homelab Dashboard", launch_url="http://192.168.1.50:8080"),
+            DeviceService(
+                port=2375, protocol="tcp", name="docker", version="Docker 24.x"
+            ),
+            DeviceService(
+                port=8080,
+                protocol="tcp",
+                name="http",
+                version="Homelab Dashboard",
+                launch_url="http://192.168.1.50:8080",
+            ),
         ],
         vuln_summary=VulnSummary(critical=0, high=2, medium=5, low=8),
         first_seen=NOW - timedelta(days=90),
@@ -106,8 +127,15 @@ MOCK_DEVICES: list[Device] = [
         confidence=0.92,
         is_online=True,
         services=[
-            DeviceService(port=80, protocol="tcp", name="http", launch_url="http://192.168.1.51"),
-            DeviceService(port=443, protocol="tcp", name="https", launch_url="https://192.168.1.51"),
+            DeviceService(
+                port=80, protocol="tcp", name="http", launch_url="http://192.168.1.51"
+            ),
+            DeviceService(
+                port=443,
+                protocol="tcp",
+                name="https",
+                launch_url="https://192.168.1.51",
+            ),
             DeviceService(port=445, protocol="tcp", name="smb", version="Samba"),
             DeviceService(port=22, protocol="tcp", name="ssh"),
         ],
@@ -127,7 +155,12 @@ MOCK_DEVICES: list[Device] = [
         confidence=0.98,
         is_online=True,
         services=[
-            DeviceService(port=554, protocol="tcp", name="rtsp", launch_url="rtsp://192.168.20.10:554/stream"),
+            DeviceService(
+                port=554,
+                protocol="tcp",
+                name="rtsp",
+                launch_url="rtsp://192.168.20.10:554/stream",
+            ),
             DeviceService(port=7080, protocol="tcp", name="http"),
         ],
         vuln_summary=VulnSummary(critical=0, high=0, medium=1, low=1),
@@ -146,7 +179,12 @@ MOCK_DEVICES: list[Device] = [
         confidence=0.98,
         is_online=True,
         services=[
-            DeviceService(port=554, protocol="tcp", name="rtsp", launch_url="rtsp://192.168.20.11:554/stream"),
+            DeviceService(
+                port=554,
+                protocol="tcp",
+                name="rtsp",
+                launch_url="rtsp://192.168.20.11:554/stream",
+            ),
         ],
         vuln_summary=VulnSummary(),
         first_seen=NOW - timedelta(days=150),

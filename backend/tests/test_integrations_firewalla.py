@@ -12,10 +12,10 @@ parse time. Most importantly:
   - Cursor pagination loops with a hard safety cap.
   - Alarm fingerprint shape: `gid|mac|type|minute_bucket`.
 """
+
 from __future__ import annotations
 
 import httpx
-import pytest
 import respx
 
 from integrations.firewalla import (
@@ -73,11 +73,26 @@ class TestAuthHeader:
 class TestIsConfigured:
     def test_msp_requires_domain_and_token(self):
         assert _integ().is_configured() is True
-        assert FirewallaIntegration(mode="msp", msp_domain="x", msp_token="").is_configured() is False
-        assert FirewallaIntegration(mode="msp", msp_domain="", msp_token="x").is_configured() is False
+        assert (
+            FirewallaIntegration(
+                mode="msp", msp_domain="x", msp_token=""
+            ).is_configured()
+            is False
+        )
+        assert (
+            FirewallaIntegration(
+                mode="msp", msp_domain="", msp_token="x"
+            ).is_configured()
+            is False
+        )
 
     def test_local_requires_url(self):
-        assert FirewallaIntegration(mode="local", local_url="http://1.2.3.4").is_configured() is True
+        assert (
+            FirewallaIntegration(
+                mode="local", local_url="http://1.2.3.4"
+            ).is_configured()
+            is True
+        )
         assert FirewallaIntegration(mode="local").is_configured() is False
 
 
@@ -88,12 +103,12 @@ class TestSeverityMap:
 
     def test_known_codes_map_correctly(self):
         # Spot-check the five severity bands.
-        assert _type_to_severity("1") == "high"        # Security Activity
-        assert _type_to_severity("2") == "medium"      # Abnormal Upload
-        assert _type_to_severity("3") == "low"         # Large Bandwidth
-        assert _type_to_severity("5") == "info"        # New Device
-        assert _type_to_severity("14") == "medium"     # Open Port
-        assert _type_to_severity("15") == "high"       # Internet Connectivity
+        assert _type_to_severity("1") == "high"  # Security Activity
+        assert _type_to_severity("2") == "medium"  # Abnormal Upload
+        assert _type_to_severity("3") == "low"  # Large Bandwidth
+        assert _type_to_severity("5") == "info"  # New Device
+        assert _type_to_severity("14") == "medium"  # Open Port
+        assert _type_to_severity("15") == "high"  # Internet Connectivity
 
     def test_unknown_code_falls_back_to_info(self):
         # Never drop an alarm on the floor; surface unknown types as info.
@@ -124,7 +139,11 @@ class TestAlarmParsing:
             "status": "active",
             "ts": 1_712_345_678.0,  # 2024-04-05T19:34:38 UTC
             "message": "Suspicious connection blocked",
-            "device": {"id": "aa:bb:cc:dd:ee:01", "name": "Couch TV", "ip": "192.168.1.50"},
+            "device": {
+                "id": "aa:bb:cc:dd:ee:01",
+                "name": "Couch TV",
+                "ip": "192.168.1.50",
+            },
             "remote": {"ip": "80.82.77.139", "domain": ""},
             "direction": "outbound",
             "protocol": "tcp",
@@ -185,18 +204,41 @@ class TestFetchAlarmsPagination:
         route = respx.get(f"{_BASE}/alarms").mock(
             side_effect=[
                 httpx.Response(
-                    200, headers={"content-type": "application/json"},
-                    json={"results": [
-                        {"aid": "a1", "gid": "g", "type": "1", "status": "active",
-                         "device": {"id": "aa:bb:cc:00:00:01"}, "remote": {}, "ts": 1_712_345_678, "message": "m1"},
-                    ], "next_cursor": "page2"},
+                    200,
+                    headers={"content-type": "application/json"},
+                    json={
+                        "results": [
+                            {
+                                "aid": "a1",
+                                "gid": "g",
+                                "type": "1",
+                                "status": "active",
+                                "device": {"id": "aa:bb:cc:00:00:01"},
+                                "remote": {},
+                                "ts": 1_712_345_678,
+                                "message": "m1",
+                            },
+                        ],
+                        "next_cursor": "page2",
+                    },
                 ),
                 httpx.Response(
-                    200, headers={"content-type": "application/json"},
-                    json={"results": [
-                        {"aid": "a2", "gid": "g", "type": "2", "status": "active",
-                         "device": {"id": "aa:bb:cc:00:00:02"}, "remote": {}, "ts": 1_712_345_700, "message": "m2"},
-                    ]},
+                    200,
+                    headers={"content-type": "application/json"},
+                    json={
+                        "results": [
+                            {
+                                "aid": "a2",
+                                "gid": "g",
+                                "type": "2",
+                                "status": "active",
+                                "device": {"id": "aa:bb:cc:00:00:02"},
+                                "remote": {},
+                                "ts": 1_712_345_700,
+                                "message": "m2",
+                            },
+                        ]
+                    },
                 ),
             ]
         )
@@ -221,26 +263,29 @@ class TestFetchBoxes:
     async def test_parses_box_roster(self):
         respx.get(f"{_BASE}/boxes").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
-                json={"results": [
-                    {
-                        "gid": "box-gid-1",
-                        "name": "HomeLab Firewalla Gold",
-                        "model": "Gold",
-                        "online": True,
-                        "version": "1.975",
-                        "publicIP": "1.2.3.4",
-                        "lastSeen": 1_712_345_678,
-                        "deviceCount": 42,
-                        "alarmCount": 7,
-                    },
-                    {"gid": "", "name": "empty-gid-skipped"},
-                ]},
+                200,
+                headers={"content-type": "application/json"},
+                json={
+                    "results": [
+                        {
+                            "gid": "box-gid-1",
+                            "name": "HomeLab Firewalla Gold",
+                            "model": "Gold",
+                            "online": True,
+                            "version": "1.975",
+                            "publicIP": "1.2.3.4",
+                            "lastSeen": 1_712_345_678,
+                            "deviceCount": 42,
+                            "alarmCount": 7,
+                        },
+                        {"gid": "", "name": "empty-gid-skipped"},
+                    ]
+                },
             )
         )
         async with _integ()._client() as c:
             boxes = await _integ().fetch_boxes(c)
-        assert len(boxes) == 1   # empty-gid row dropped
+        assert len(boxes) == 1  # empty-gid row dropped
         b = boxes[0]
         assert b.gid == "box-gid-1"
         assert b.model == "Gold"
@@ -253,11 +298,14 @@ class TestTestConnection:
     async def test_success_reports_box_count(self):
         respx.get(f"{_BASE}/boxes").mock(
             return_value=httpx.Response(
-                200, headers={"content-type": "application/json"},
-                json={"results": [
-                    {"gid": "g1", "name": "Box A", "online": True},
-                    {"gid": "g2", "name": "Box B", "online": False},
-                ]},
+                200,
+                headers={"content-type": "application/json"},
+                json={
+                    "results": [
+                        {"gid": "g1", "name": "Box A", "online": True},
+                        {"gid": "g2", "name": "Box B", "online": False},
+                    ]
+                },
             )
         )
         res = await _integ().test_connection()
@@ -266,7 +314,9 @@ class TestTestConnection:
 
     @respx.mock
     async def test_401_reports_auth_error(self):
-        respx.get(f"{_BASE}/boxes").mock(return_value=httpx.Response(401, json={"error": "unauth"}))
+        respx.get(f"{_BASE}/boxes").mock(
+            return_value=httpx.Response(401, json={"error": "unauth"})
+        )
         res = await _integ().test_connection()
         assert res.ok is False
         assert "authent" in res.message.lower() or "token" in res.message.lower()

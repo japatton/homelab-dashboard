@@ -36,6 +36,7 @@ async def report_detail(report_id: str):
 @router.delete("/reports/{report_id}")
 async def report_delete(report_id: str):
     from services.audit_service import write_audit
+
     ok = await delete_report(report_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -52,6 +53,7 @@ async def trigger_analysis(period_hours: int = 24):
         return {"triggered": True, "mock": True}
 
     from services.audit_service import write_audit
+
     # Fire-and-forget — the job persists its own result whether success or failure.
     spawn(run_daily_analysis(period_hours=period_hours), name="analysis:daily")
     await write_audit("trigger_analysis", "user", {"period_hours": period_hours})

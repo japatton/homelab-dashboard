@@ -12,9 +12,9 @@ page. In particular:
     clobbers keys owned by other sources — rule #5.
   - Gateway merges never flip is_online from True to False (rule #4).
 """
+
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Optional
 
@@ -73,7 +73,11 @@ async def test_lease_creates_new_device(initialised_db):
     await merge_gateway_leases(
         source="opnsense",
         source_label="OPNsense 24.7",
-        leases=[FakeLease(mac="aa:bb:cc:dd:ee:ff", address="10.0.0.50", hostname="raspberry")],
+        leases=[
+            FakeLease(
+                mac="aa:bb:cc:dd:ee:ff", address="10.0.0.50", hostname="raspberry"
+            )
+        ],
     )
     devices = await get_all_devices()
     assert len(devices) == 1
@@ -94,12 +98,14 @@ async def test_lease_description_beats_hostname(initialised_db):
     await merge_gateway_leases(
         source="opnsense",
         source_label="OPNsense",
-        leases=[FakeLease(
-            mac="aa:bb:cc:11:22:33",
-            address="10.0.0.10",
-            hostname="iPhone-von-Alex",
-            description="Alex's iPad",
-        )],
+        leases=[
+            FakeLease(
+                mac="aa:bb:cc:11:22:33",
+                address="10.0.0.10",
+                hostname="iPhone-von-Alex",
+                description="Alex's iPad",
+            )
+        ],
     )
     devices = await get_all_devices()
     assert devices[0].hostname == "Alex's iPad"
@@ -127,11 +133,13 @@ async def test_lease_does_not_downgrade_unifi_device(initialised_db):
     await merge_gateway_leases(
         source="opnsense",
         source_label="OPNsense",
-        leases=[FakeLease(
-            mac=mac,
-            address="10.0.0.1",
-            hostname="iot-noise",
-        )],
+        leases=[
+            FakeLease(
+                mac=mac,
+                address="10.0.0.1",
+                hostname="iot-noise",
+            )
+        ],
     )
     devices = await get_all_devices()
     assert len(devices) == 1
@@ -153,7 +161,14 @@ async def test_arp_only_entry_fills_missing_fields(initialised_db):
         source="opnsense",
         source_label="OPNsense",
         leases=[],
-        arp=[FakeArp(mac="11:22:33:44:55:66", ip="10.0.0.77", hostname="static-host", interface="LAN")],
+        arp=[
+            FakeArp(
+                mac="11:22:33:44:55:66",
+                ip="10.0.0.77",
+                hostname="static-host",
+                interface="LAN",
+            )
+        ],
     )
     devices = await get_all_devices()
     assert len(devices) == 1
@@ -168,7 +183,14 @@ async def test_lease_and_arp_lease_wins_for_overlapping_mac(initialised_db):
     await merge_gateway_leases(
         source="opnsense",
         source_label="OPNsense",
-        leases=[FakeLease(mac=mac, address="10.0.0.20", hostname="lease-host", description="Lease Name")],
+        leases=[
+            FakeLease(
+                mac=mac,
+                address="10.0.0.20",
+                hostname="lease-host",
+                description="Lease Name",
+            )
+        ],
         arp=[FakeArp(mac=mac, ip="10.0.0.99", hostname="arp-host")],
     )
     devices = await get_all_devices()
@@ -185,7 +207,10 @@ async def test_lease_skips_rows_missing_mac(initialised_db):
     await merge_gateway_leases(
         source="opnsense",
         source_label="OPNsense",
-        leases=[FakeLease(mac="", address="10.0.0.100"), FakeLease(mac="aa:bb:cc:ee:ff:00", address="10.0.0.101")],
+        leases=[
+            FakeLease(mac="", address="10.0.0.100"),
+            FakeLease(mac="aa:bb:cc:ee:ff:00", address="10.0.0.101"),
+        ],
     )
     devices = await get_all_devices()
     assert len(devices) == 1
@@ -203,7 +228,9 @@ async def test_gateway_metadata_merge_preserves_other_integrations_keys(initiali
     )
     await merge_firewalla_devices(
         source_label="Firewalla Gold",
-        devices=[FakeFirewallaDevice(mac=mac, ip="10.0.0.50", name="Couch TV", vendor="LG")],
+        devices=[
+            FakeFirewallaDevice(mac=mac, ip="10.0.0.50", name="Couch TV", vendor="LG")
+        ],
     )
     devices = await get_all_devices()
     assert len(devices) == 1
@@ -223,12 +250,14 @@ async def test_firewalla_online_flips_to_true(initialised_db):
     # A positive online sighting from Firewalla should commit is_online=1.
     await merge_firewalla_devices(
         source_label="Firewalla Gold",
-        devices=[FakeFirewallaDevice(
-            mac="aa:bb:cc:00:00:01",
-            ip="10.0.0.10",
-            name="Phone",
-            online=True,
-        )],
+        devices=[
+            FakeFirewallaDevice(
+                mac="aa:bb:cc:00:00:01",
+                ip="10.0.0.10",
+                name="Phone",
+                online=True,
+            )
+        ],
     )
     devices = await get_all_devices()
     assert devices[0].is_online is True
@@ -263,17 +292,19 @@ async def test_firewalla_offline_does_not_overwrite_true(initialised_db):
 async def test_firewalla_stores_metadata_under_namespaced_key(initialised_db):
     await merge_firewalla_devices(
         source_label="Firewalla Gold",
-        devices=[FakeFirewallaDevice(
-            mac="aa:bb:cc:00:00:03",
-            ip="10.0.0.15",
-            name="Nest Hub",
-            vendor="Google",
-            gid="gid-xyz",
-            network_name="IoT",
-            group_name="Smart Home",
-            online=True,
-            last_seen=1_712_345_678.0,
-        )],
+        devices=[
+            FakeFirewallaDevice(
+                mac="aa:bb:cc:00:00:03",
+                ip="10.0.0.15",
+                name="Nest Hub",
+                vendor="Google",
+                gid="gid-xyz",
+                network_name="IoT",
+                group_name="Smart Home",
+                online=True,
+                last_seen=1_712_345_678.0,
+            )
+        ],
     )
     devices = await get_all_devices()
     fw = devices[0].metadata["firewalla_gateway"]

@@ -52,6 +52,7 @@ async def _check_docker_socket() -> None:
     import logging
     import os
     import asyncio
+
     log = logging.getLogger("docker_preflight")
 
     sock_path = "/var/run/docker.sock"
@@ -61,6 +62,7 @@ async def _check_docker_socket() -> None:
 
     try:
         import docker  # lazy; same pattern as openvas_reset
+
         def _ping():
             client = docker.from_env()
             try:
@@ -73,6 +75,7 @@ async def _check_docker_socket() -> None:
                     client.close()
                 except Exception as close_err:
                     log.debug("docker client close ignored: %s", close_err)
+
         await asyncio.to_thread(_ping)
         log.info("docker.sock preflight: OK (OpenVAS rotate path available)")
     except Exception as e:
@@ -96,7 +99,8 @@ async def _check_docker_socket() -> None:
                 "`docker compose up -d --force-recreate backend`. "
                 "Until then the OpenVAS Rotate button will error with the "
                 "same message. Full error: %s",
-                sock_gid, e,
+                sock_gid,
+                e,
             )
         else:
             # Catch-all: dockerd down, API version mismatch, etc. Warn
@@ -127,6 +131,7 @@ async def lifespan(app: FastAPI):
 
         # Start periodic scan scheduler
         from scheduler import start_scheduler
+
         await start_scheduler(
             nmap_interval_minutes=cfg.scheduler.nmap_interval_minutes,
             unifi_interval_seconds=cfg.scheduler.unifi_poll_interval_seconds,
@@ -143,11 +148,13 @@ async def lifespan(app: FastAPI):
         if cfg.elasticsearch.host:
             try:
                 from integrations.elasticsearch_client import get_es_client
+
                 es = get_es_client()
                 if es is not None:
                     await es.ensure_indices()
             except Exception as _e:
                 import logging as _log
+
                 _log.getLogger(__name__).warning("Elasticsearch init skipped: %s", _e)
 
     yield
@@ -156,6 +163,7 @@ async def lifespan(app: FastAPI):
     if not _MOCK:
         from scheduler import stop_scheduler
         from integrations.elasticsearch_client import close_es_client
+
         await stop_scheduler()
         await close_es_client()
 
@@ -187,17 +195,18 @@ app.add_middleware(
 # Opt-in bearer-token gate over /api/*. Unset → no-op.
 app.add_middleware(DashboardTokenMiddleware, token=get_dashboard_token())
 
-# Routers
-from api.network import router as network_router
-from api.devices import router as devices_router
-from api.settings import router as settings_router
-from api.setup import router as setup_router
-from api.scans import router as scans_router
-from api.claude_integration import router as claude_router
-from api.scheduler import router as scheduler_router
-from api.vulns import router as vulns_router
-from api.analysis import router as analysis_router
-from api.alarms import router as alarms_router
+# Routers — imported here (not at top) so the middleware stack above is fully
+# wired before any route module side-effects run. The E402 noqa is deliberate.
+from api.network import router as network_router  # noqa: E402
+from api.devices import router as devices_router  # noqa: E402
+from api.settings import router as settings_router  # noqa: E402
+from api.setup import router as setup_router  # noqa: E402
+from api.scans import router as scans_router  # noqa: E402
+from api.claude_integration import router as claude_router  # noqa: E402
+from api.scheduler import router as scheduler_router  # noqa: E402
+from api.vulns import router as vulns_router  # noqa: E402
+from api.analysis import router as analysis_router  # noqa: E402
+from api.alarms import router as alarms_router  # noqa: E402
 
 app.include_router(network_router)
 app.include_router(devices_router)
@@ -224,9 +233,11 @@ _notified_sids: set[str] = set()
 async def connect(sid, environ):
     if _MOCK:
         from mock.topology_fixtures import MOCK_TOPOLOGY
+
         await sio.emit("topology:updated", MOCK_TOPOLOGY.model_dump(), to=sid)
         if sid not in _notified_sids:
             from api.claude_integration import _staged
+
             pending = [v for v in _staged.values() if v["status"] == "pending"]
             if pending:
                 await sio.emit("claude:staged", pending[0], to=sid)
@@ -236,6 +247,7 @@ async def connect(sid, environ):
         try:
             from services.device_service import get_all_devices
             from services.topology_service import build_topology_graph
+
             devices = await get_all_devices()
             if devices:
                 topology = await build_topology_graph(devices)

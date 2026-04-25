@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Centralised audit-log writer.
 
@@ -13,6 +11,8 @@ rows are trimmed in the same transaction as the insert — the table never
 briefly exceeds the cap, and there is no separate sweeper job to keep in
 sync with the scheduler.
 """
+
+from __future__ import annotations
 
 import json
 import logging
@@ -29,11 +29,22 @@ from database import get_db
 # type. Callers are *supposed* to filter these out themselves (complete_setup
 # does), but this is a defence-in-depth catch for the "someone forgot" case.
 # Match is case-insensitive on the final path segment.
-_SENSITIVE_KEYS = frozenset({
-    "password", "pass", "passwd", "api_key", "apikey",
-    "token", "secret", "auth", "credential", "credentials",
-    "private_key", "ssh_password",
-})
+_SENSITIVE_KEYS = frozenset(
+    {
+        "password",
+        "pass",
+        "passwd",
+        "api_key",
+        "apikey",
+        "token",
+        "secret",
+        "auth",
+        "credential",
+        "credentials",
+        "private_key",
+        "ssh_password",
+    }
+)
 
 _SCRUBBED = "***"
 
@@ -64,6 +75,7 @@ class _AuditEncoder(json.JSONEncoder):
         if isinstance(obj, SecretStr):
             return _SCRUBBED
         return str(obj)
+
 
 log = logging.getLogger(__name__)
 
@@ -113,10 +125,12 @@ async def list_audit(limit: int = AUDIT_MAX_ENTRIES) -> list[dict]:
     """Most recent audit rows first, with `detail` already JSON-decoded."""
     limit = max(1, min(limit, AUDIT_MAX_ENTRIES))
     async with get_db() as db:
-        rows = await (await db.execute(
-            "SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?",
-            (limit,),
-        )).fetchall()
+        rows = await (
+            await db.execute(
+                "SELECT * FROM audit_log ORDER BY timestamp DESC LIMIT ?",
+                (limit,),
+            )
+        ).fetchall()
     out = []
     for r in rows:
         d = dict(r)

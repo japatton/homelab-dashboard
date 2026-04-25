@@ -15,6 +15,7 @@ class IntervalUpdate(BaseModel):
     unifi_seconds: int | None = None
     openvas_hours: int | None = None
 
+
 _MOCK = os.getenv("BACKEND_MOCK", "false").lower() == "true"
 
 
@@ -31,6 +32,7 @@ async def scheduler_status():
         }
     from scheduler import get_all_jobs
     from scheduler.scheduler import get_scheduler
+
     sched = get_scheduler()
     return {
         "running": sched.running,
@@ -69,6 +71,7 @@ async def trigger_job(job_id: str):
         raise HTTPException(status_code=404, detail=f"Unknown job: {job_id}")
 
     from services.audit_service import write_audit
+
     await write_audit("trigger_job", "user", {"job_id": job_id})
     return {"triggered": job_id}
 
@@ -105,6 +108,7 @@ async def update_intervals(body: IntervalUpdate):
     if updated:
         mgr.save(cfg)
         from services.audit_service import write_audit
+
         await write_audit("save_scan_intervals", "user", updated)
 
     return {"updated": updated}
@@ -118,9 +122,11 @@ async def pause_job(job_id: str):
     if _MOCK:
         return {"paused": job_id, "mock": True}
     from scheduler.scheduler import pause_job as _pause
+
     if not _pause(job_id):
         raise HTTPException(status_code=404, detail=f"Unknown job: {job_id}")
     from services.audit_service import write_audit
+
     await write_audit("pause_job", "user", {"job_id": job_id})
     return {"paused": job_id}
 
@@ -130,8 +136,10 @@ async def resume_job(job_id: str):
     if _MOCK:
         return {"resumed": job_id, "mock": True}
     from scheduler.scheduler import resume_job as _resume
+
     if not _resume(job_id):
         raise HTTPException(status_code=404, detail=f"Unknown job: {job_id}")
     from services.audit_service import write_audit
+
     await write_audit("resume_job", "user", {"job_id": job_id})
     return {"resumed": job_id}

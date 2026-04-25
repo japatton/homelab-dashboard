@@ -6,8 +6,17 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 DeviceType = Literal[
-    "gateway", "switch", "ap", "server", "workstation",
-    "laptop", "camera", "doorbell", "iot", "phone", "unknown"
+    "gateway",
+    "switch",
+    "ap",
+    "server",
+    "workstation",
+    "laptop",
+    "camera",
+    "doorbell",
+    "iot",
+    "phone",
+    "unknown",
 ]
 
 DeviceStatus = Literal["online", "offline", "scanning", "unknown"]
