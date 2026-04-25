@@ -11,7 +11,7 @@ aiosqlite==0.20.0
 elasticsearch[async]==8.15.1
 apscheduler==3.10.4
 python-nmap==0.7.1
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 python-gvm==24.8.0
 asyncssh==2.17.0
 docker==7.1.0
