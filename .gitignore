@@ -1,0 +1,81 @@
+# ── Environment & secrets ────────────────────────────────────────────────
+.env
+.env.bak
+.env.local
+.env.*.local
+config.yml
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+
+# ── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+.hypothesis/
+pip-wheel-metadata/
+
+# ── Node / frontend ──────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+.vite/
+*.tsbuildinfo
+
+# ── Build artifacts ──────────────────────────────────────────────────────
+*.egg-info/
+dist/
+build/
+*.log
+
+# ── Docker volumes (local dev only) ──────────────────────────────────────
+data/
+homelab-data/
+
+# ── Databases (ad-hoc local runs outside Docker) ─────────────────────────
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# ── Test artifacts ───────────────────────────────────────────────────────
+/tmp/tsc.log
+test-results/
+playwright-report/
+.nyc_output/
+
+# ── OS ───────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Editor ───────────────────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ── Claude / AI scratch ──────────────────────────────────────────────────
+.claude/
+.anthropic/

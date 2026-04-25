@@ -1,0 +1,92 @@
+name: Bug report
+description: Something is broken or not behaving the way the docs say it should.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more specific you are about
+        *where* the break happens (mock mode vs. real deploy, which integration,
+        which browser), the faster it gets fixed.
+
+        **Security issues do NOT go here.** See [SECURITY.md](../blob/main/SECURITY.md)
+        for private disclosure via GitHub Security Advisories.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Git tag, release number, or commit SHA. `git rev-parse HEAD` inside the repo is fine.
+      placeholder: "v0.2.0  —  or  —  a1b2c3d"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deploy_mode
+    attributes:
+      label: Deployment mode
+      description: How were you running the dashboard when you hit this?
+      options:
+        - Mock mode (BACKEND_MOCK=true, synthetic data)
+        - Local dev (uvicorn --reload + vite dev server)
+        - Docker Compose on local host
+        - Docker Compose on remote host via deploy.sh
+        - Other (describe below)
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: Describe what you saw.
+      placeholder: |
+        Clicked "Acknowledge" on an alarm row and the page went blank.
+        Sidebar badge still showed the old count after a socket reconnect.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+      description: |
+        Shortest path to trigger the bug. If it only shows up with real
+        hardware, say so — mock-only repros are still useful.
+      placeholder: |
+        1. Start the stack with `make mock`
+        2. Open http://localhost:8080/security
+        3. Click the bell icon in the sidebar
+        4. Page reloads to /security, badge disappears but count-in-list wrong
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Backend logs (`docker compose logs backend` or the terminal running
+        uvicorn) + any browser console errors. Redact secrets before pasting.
+      render: shell
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser (if frontend bug)
+      placeholder: "Chrome 134 / Firefox 128 / Safari 18.2"
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Hardware models, network size, integrations enabled, env-var deviations from defaults, screenshots — whatever helps.

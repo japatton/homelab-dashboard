@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: #020c1b;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0a1628;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #0d2137;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0,229,255,0.3);
+  }
+}
+
+@layer components {
+  .tron-panel {
+    @apply bg-tron-panel border border-tron-border rounded-lg;
+  }
+
+  .tron-panel-glow {
+    @apply tron-panel shadow-tron-sm;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .tron-panel-glow:hover {
+    @apply shadow-tron-md;
+  }
+
+  .tron-text {
+    @apply text-tron-cyan font-mono;
+  }
+
+  .tron-grid-bg {
+    background-image:
+      linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .glow-cyan {
+    color: #00e5ff;
+    text-shadow: 0 0 8px rgba(0,229,255,0.7);
+  }
+
+  .glow-green {
+    color: #00ff88;
+    text-shadow: 0 0 8px rgba(0,255,136,0.7);
+  }
+
+  .glow-red {
+    color: #ff3333;
+    text-shadow: 0 0 8px rgba(255,51,51,0.7);
+  }
+
+  .scanline-overlay {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scanline-overlay::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+/* React Flow overrides */
+.react-flow__background {
+  background-color: #020c1b !important;
+}
+
+.react-flow__minimap {
+  background-color: #0a1628 !important;
+  border: 1px solid #0d2137;
+  border-radius: 4px;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0,229,255,0.1) !important;
+}
+
+.react-flow__controls {
+  background: #0a1628 !important;
+  border: 1px solid #0d2137 !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: transparent !important;
+  border-bottom: 1px solid #0d2137 !important;
+  fill: #00e5ff !important;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(0,229,255,0.1) !important;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2;
+}

@@ -1,0 +1,82 @@
+name: Feature request
+description: Suggest an enhancement or a new capability.
+title: "[feat] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Quick guidance before you file:
+
+        - Check `ROADMAP.md` first — if the feature is already on the list,
+          add a 👍 reaction to the existing issue instead of opening a duplicate.
+        - Features that fit something already half-built (another gateway
+          integration following the OPNsense/Firewalla pattern, another
+          topology view, etc.) tend to move faster than standalone new ideas.
+        - If you're willing to implement it yourself, say so — that moves it
+          from "wishlist" to "design discussion" immediately.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Start from the user need, not the implementation.
+      placeholder: |
+        "I run a pfSense box alongside my UniFi gear, and the dashboard
+        currently has no way to surface pfSense alerts in the unified
+        alarm feed."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should the dashboard do? How should it look / feel / behave?
+      placeholder: |
+        A pfSense integration module following the same shape as
+        integrations/opnsense.py — REST client, poll job on a settings-gated
+        schedule, alarms emitted through the same fingerprint-dedup path,
+        card in the Settings page with test-connection.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: fit
+    attributes:
+      label: Does this fit an existing pattern?
+      description: Check off whichever applies — helps with sizing the change.
+      multiple: true
+      options:
+        - New gateway integration (UniFi / OPNsense / Firewalla shape)
+        - New scheduled job
+        - New page in the SPA
+        - New settings card
+        - New alarm source feeding the existing feed
+        - New topology view
+        - New Claude-generated integration flow
+        - None of the above / genuinely new
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you think about? Why did you rule it out?
+
+  - type: dropdown
+    id: willing
+    attributes:
+      label: Are you willing to implement this?
+      options:
+        - Yes, I'll open the PR
+        - Yes, with design guidance
+        - No, but I'll test it
+        - No — just suggesting
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots / mockups / links / references to other projects that do this well.

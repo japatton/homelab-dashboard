@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HOMELAB DASHBOARD — OPERATIONS MANUAL</title>
+<style>
+  /* ── Fonts ────────────────────────────────────────────────────────────── */
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  /* ── Palette ─────────────────────────────────────────────────────────── */
+  :root {
+    --cyan:    #00f5ff;
+    --cyan-dim: #00b4c8;
+    --cyan-ghost: #00f5ff18;
+    --orange:  #ff8c00;
+    --green:   #39ff14;
+    --red:     #ff2a2a;
+    --bg:      #050b14;
+    --bg2:     #080f1c;
+    --bg3:     #0c1628;
+    --border:  #0e3a4a;
+    --border2: #0a2535;
+    --text:    #a8d8e8;
+    --muted:   #3d6070;
+    --white:   #d0eef8;
+  }
+
+  /* ── Reset & Base ────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Scanline overlay ────────────────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 245, 255, 0.015) 2px,
+      rgba(0, 245, 255, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Grid background ─────────────────────────────────────────────────── */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Layout ──────────────────────────────────────────────────────────── */
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 32px 80px;
+  }
+
+  /* ── Hero header ─────────────────────────────────────────────────────── */
+  .hero {
+    text-align: center;
+    padding: 80px 0 60px;
+    position: relative;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 300px;
+    background: radial-gradient(ellipse, rgba(0,245,255,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-label {
+    font-size: 11px;
+    letter-spacing: 0.5em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .hero-title {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: clamp(28px, 5vw, 52px);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--white);
+    text-shadow:
+      0 0 20px rgba(0,245,255,0.8),
+      0 0 60px rgba(0,245,255,0.3),
+      0 0 120px rgba(0,245,255,0.15);
+    line-height: 1.1;
+    margin-bottom: 8px;
+  }
+
+  .hero-subtitle {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    letter-spacing: 0.35em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 40px;
+  }
+
+  .hero-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 40px;
+  }
+
+  .hero-divider-line {
+    height: 1px;
+    width: 120px;
+    background: linear-gradient(90deg, transparent, var(--cyan));
+  }
+
+  .hero-divider-line.right {
+    background: linear-gradient(270deg, transparent, var(--cyan));
+  }
+
+  .hero-divider-diamond {
+    width: 8px;
+    height: 8px;
+    background: var(--cyan);
+    transform: rotate(45deg);
+    box-shadow: 0 0 12px var(--cyan);
+  }
+
+  .hero-meta {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .hero-badge {
+    padding: 6px 18px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    background: var(--bg2);
+  }
+
+  .hero-badge span {
+    color: var(--cyan);
+    margin-left: 6px;
+  }
+
+  /* ── Table of Contents ───────────────────────────────────────────────── */
+  .toc {
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 32px;
+    margin-bottom: 60px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .toc::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  }
+
+  .toc-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .toc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+  }
+
+  .toc a {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    padding: 6px 10px;
+    border-left: 2px solid var(--border);
+    transition: all 0.15s;
+    display: block;
+  }
+
+  .toc a:hover {
+    color: var(--cyan);
+    border-left-color: var(--cyan);
+    background: var(--cyan-ghost);
+    padding-left: 14px;
+  }
+
+  .toc-num {
+    color: var(--muted);
+    margin-right: 8px;
+  }
+
+  /* ── Section ─────────────────────────────────────────────────────────── */
+  .section {
+    margin-bottom: 64px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+
+  .section-header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 80px;
+    height: 1px;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+  }
+
+  .section-num {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.3em;
+    flex-shrink: 0;
+  }
+
+  .section-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--white);
+    text-transform: uppercase;
+  }
+
+  .section-title .accent {
+    color: var(--cyan);
+    text-shadow: 0 0 12px rgba(0,245,255,0.5);
+  }
+
+  /* ── Subsection ──────────────────────────────────────────────────────── */
+  .subsection {
+    margin-bottom: 40px;
+  }
+
+  .subsection-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    color: var(--cyan-dim);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .subsection-title::before {
+    content: '▸';
+    color: var(--cyan);
+    font-size: 10px;
+  }
+
+  /* ── Panel / Card ────────────────────────────────────────────────────── */
+  .panel {
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 24px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--cyan), transparent);
+  }
+
+  .panel-title {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Code block ──────────────────────────────────────────────────────── */
+  .code-block {
+    background: #020810;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    padding: 20px 24px;
+    margin: 16px 0;
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .code-block .code-label {
+    position: absolute;
+    top: -1px;
+    right: 12px;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    background: #020810;
+    padding: 2px 8px;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    border-top: none;
+  }
+
+  .code-block pre {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--white);
+    white-space: pre;
+  }
+
+  .code-block .prompt { color: var(--cyan); }
+  .code-block .comment { color: var(--muted); }
+  .code-block .cmd { color: var(--white); }
+  .code-block .value { color: var(--orange); }
+  .code-block .string { color: #a8ff78; }
+  .code-block .flag { color: #c0b5ff; }
+
+  code {
+    font-family: 'Share Tech Mono', monospace;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--cyan);
+    padding: 1px 6px;
+    font-size: 12px;
+  }
+
+  /* ── Step list ───────────────────────────────────────────────────────── */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+  }
+
+  .steps li {
+    counter-increment: step;
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    align-items: flex-start;
+  }
+
+  .steps li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--cyan);
+    min-width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-content { flex: 1; }
+  .step-title {
+    color: var(--white);
+    font-size: 13px;
+    margin-bottom: 6px;
+    letter-spacing: 0.05em;
+  }
+  .step-desc { color: var(--text); font-size: 13px; }
+
+  /* ── Alert boxes ─────────────────────────────────────────────────────── */
+  .alert {
+    display: flex;
+    gap: 14px;
+    padding: 16px 20px;
+    border: 1px solid;
+    margin: 16px 0;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .alert-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+
+  .alert.info    { border-color: var(--border); background: var(--bg2); color: var(--text); }
+  .alert.warn    { border-color: rgba(255,140,0,0.4); background: rgba(255,140,0,0.06); color: #ffc870; }
+  .alert.success { border-color: rgba(57,255,20,0.3); background: rgba(57,255,20,0.05); color: #90ff70; }
+  .alert.tip     { border-color: rgba(0,245,255,0.3); background: var(--cyan-ghost); color: var(--cyan); }
+
+  /* ── Feature grid ────────────────────────────────────────────────────── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .feature-card {
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .feature-card:hover { border-color: var(--cyan); }
+
+  .feature-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 40px; height: 40px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    transition: border-color 0.2s;
+  }
+
+  .feature-card:hover::after { border-color: var(--cyan); }
+
+  .feature-icon {
+    font-size: 20px;
+    margin-bottom: 12px;
+  }
+
+  .feature-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .feature-desc {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* ── Config table ────────────────────────────────────────────────────── */
+  .config-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 12px;
+  }
+
+  .config-table th {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+
+  .config-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border2);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  .config-table tr:hover td { background: var(--cyan-ghost); }
+
+  .config-table .key    { color: var(--cyan); font-size: 12px; }
+  .config-table .type   { color: var(--muted); font-size: 11px; }
+  .config-table .default{ color: var(--orange); font-size: 11px; }
+  .config-table .desc   { color: var(--text); }
+
+  /* ── Status badges ───────────────────────────────────────────────────── */
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border: 1px solid;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .badge-online  { color: var(--green); border-color: rgba(57,255,20,0.4); background: rgba(57,255,20,0.07); }
+  .badge-offline { color: var(--red);   border-color: rgba(255,42,42,0.4); background: rgba(255,42,42,0.07); }
+  .badge-pending { color: var(--orange);border-color: rgba(255,140,0,0.4); background: rgba(255,140,0,0.07); }
+  .badge-unknown { color: var(--orange);border-color: rgba(255,140,0,0.4); background: rgba(255,140,0,0.07); }
+  .badge-cyan    { color: var(--cyan);  border-color: rgba(0,245,255,0.3); background: var(--cyan-ghost); }
+
+  /* ── Architecture diagram ─────────────────────────────────────────────── */
+  .arch-diagram {
+    background: #020810;
+    border: 1px solid var(--border);
+    padding: 32px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--text);
+    overflow-x: auto;
+    position: relative;
+  }
+
+  .arch-diagram::before {
+    content: 'SYSTEM ARCHITECTURE';
+    position: absolute;
+    top: -1px; left: 24px;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 0.4em;
+    color: var(--muted);
+    background: #020810;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    border-top: none;
+  }
+
+  .arch-line-cyan   { color: var(--cyan); }
+  .arch-line-green  { color: var(--green); }
+  .arch-line-orange { color: var(--orange); }
+  .arch-line-muted  { color: var(--muted); }
+  .arch-line-white  { color: var(--white); }
+
+  /* ── Nav/sidebar simulation ───────────────────────────────────────────── */
+  .page-preview {
+    display: flex;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    overflow: hidden;
+    margin: 16px 0;
+  }
+
+  .page-preview-nav {
+    width: 40px;
+    background: #03090f;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    gap: 16px;
+  }
+
+  .nav-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 1px;
+  }
+
+  .nav-dot.active {
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+  }
+
+  .page-preview-content {
+    flex: 1;
+    padding: 20px;
+  }
+
+  .page-title-bar {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border2);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+
+  /* ── Inline tags ──────────────────────────────────────────────────────── */
+  .tag {
+    display: inline-block;
+    padding: 1px 8px;
+    font-size: 10px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin: 0 3px;
+    vertical-align: middle;
+  }
+
+  /* ── Kbd ──────────────────────────────────────────────────────────────── */
+  kbd {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    color: var(--white);
+    padding: 2px 8px;
+    display: inline-block;
+  }
+
+  /* ── HR ───────────────────────────────────────────────────────────────── */
+  .section-rule {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 60px 0;
+    opacity: 0.5;
+  }
+
+  .section-rule::before,
+  .section-rule::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  }
+
+  .section-rule-icon {
+    color: var(--cyan);
+    font-size: 12px;
+    letter-spacing: 0.5em;
+  }
+
+  /* ── Scrollbar ────────────────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--cyan-dim); }
+
+  /* ── Footer ───────────────────────────────────────────────────────────── */
+  .footer {
+    text-align: center;
+    padding: 40px 0 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+  }
+
+  .footer .footer-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: var(--cyan);
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  p { margin-bottom: 12px; color: var(--text); }
+  ul, ol { padding-left: 20px; margin-bottom: 12px; }
+  li { margin-bottom: 6px; color: var(--text); }
+  strong { color: var(--white); }
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-shadow: 0 0 8px var(--cyan); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- HERO                                                               -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <header class="hero">
+    <div class="hero-label">Flynn Archive — Ops Log v1.0.0</div>
+    <div class="hero-title">HOMELAB<br>DASHBOARD</div>
+    <div class="hero-subtitle">A Digital Frontier For Your Network</div>
+    <div class="hero-divider">
+      <div class="hero-divider-line"></div>
+      <div class="hero-divider-diamond"></div>
+      <div class="hero-divider-line right"></div>
+    </div>
+    <div class="hero-meta">
+      <div class="hero-badge">Stack<span>React 18 + FastAPI</span></div>
+      <div class="hero-badge">Runtime<span>Python 3.10+</span></div>
+      <div class="hero-badge">Transport<span>Socket.IO</span></div>
+      <div class="hero-badge">Deploy<span>Docker Compose</span></div>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- TABLE OF CONTENTS                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <nav class="toc">
+    <div class="toc-title">◈ Index</div>
+    <div class="toc-grid">
+      <a href="#quickstart"><span class="toc-num">01.</span> Quick Start</a>
+      <a href="#prerequisites"><span class="toc-num">02.</span> Prerequisites</a>
+      <a href="#local-dev"><span class="toc-num">03.</span> Local Development</a>
+      <a href="#setup-wizard"><span class="toc-num">04.</span> Setup Wizard</a>
+      <a href="#deploy"><span class="toc-num">05.</span> Production Deploy</a>
+      <a href="#network-map"><span class="toc-num">06.</span> Network Map</a>
+      <a href="#devices"><span class="toc-num">07.</span> Devices</a>
+      <a href="#vulns"><span class="toc-num">08.</span> Vulnerabilities</a>
+      <a href="#claude"><span class="toc-num">09.</span> Claude Integration</a>
+      <a href="#security"><span class="toc-num">10.</span> Security &amp; Alarms</a>
+      <a href="#settings"><span class="toc-num">11.</span> Settings</a>
+      <a href="#config-ref"><span class="toc-num">12.</span> Config Reference</a>
+      <a href="#architecture"><span class="toc-num">13.</span> Architecture</a>
+      <a href="#undeploy"><span class="toc-num">14.</span> Undeploy / De-Rez</a>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 01 · QUICK START                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="quickstart">
+    <div class="section-header">
+      <div class="section-num">01</div>
+      <div class="section-title"><span class="accent">Quick</span> Start</div>
+    </div>
+
+    <p>A way in. Synthetic signal. No hardware, no scans, no stakes — you walk the corridors of the Grid before you trust it with the real thing. One command. It fires up the whole world, pre-populated.</p>
+
+    <div class="code-block">
+      <div class="code-label">terminal</div>
+      <pre><span class="comment"># Clone and enter the repo</span>
+<span class="prompt">$</span> <span class="cmd">git clone https://github.com/your-org/homelab-dashboard</span>
+<span class="prompt">$</span> <span class="cmd">cd homelab-dashboard</span>
+
+<span class="comment"># One command — spins up frontend + backend with mock data</span>
+<span class="prompt">$</span> <span class="cmd">make mock</span></pre>
+    </div>
+
+    <div class="alert tip">
+      <div class="alert-icon">◈</div>
+      <div><code>make mock</code> lights up the frontend on <strong>port 5173</strong> and the backend on <strong>port 8000</strong> with <code>BACKEND_MOCK=true</code>. No Nmap. No UniFi. No OpenVAS. Eleven phantom devices, full topology — the Grid, in a bottle.</div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-label">browser</div>
+      <pre><span class="comment"># Open in your browser</span>
+<span class="prompt">→</span> <span class="string">http://localhost:5173</span></pre>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 02 · PREREQUISITES                                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="prerequisites">
+    <div class="section-header">
+      <div class="section-num">02</div>
+      <div class="section-title"><span class="accent">Pre</span>requisites</div>
+    </div>
+
+    <p>The Grid has rules. Before you can enter, the tools have to be in place — the compilers, the runtimes, the transport layer. Check the manifest. If something's missing, install it now. The system won't boot without it.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Development Machine</div>
+      <table class="config-table">
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Minimum Version</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="key">Node.js</td>
+            <td class="default">18+</td>
+            <td class="desc">Frontend build toolchain (Vite)</td>
+          </tr>
+          <tr>
+            <td class="key">Python</td>
+            <td class="default">3.10+</td>
+            <td class="desc">FastAPI backend, async/await syntax</td>
+          </tr>
+          <tr>
+            <td class="key">Docker + Compose</td>
+            <td class="default">24 / 2.x</td>
+            <td class="desc">Production container stack</td>
+          </tr>
+          <tr>
+            <td class="key">make</td>
+            <td class="default">Any</td>
+            <td class="desc">Task runner for dev workflows</td>
+          </tr>
+          <tr>
+            <td class="key">rsync</td>
+            <td class="default">Any</td>
+            <td class="desc">Remote deploy file sync (optional)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Optional Integrations</div>
+      <table class="config-table">
+        <thead>
+          <tr>
+            <th>Integration</th>
+            <th>Required For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="key">Nmap <span class="type">(system)</span></td>
+            <td class="desc">Real network discovery scans</td>
+          </tr>
+          <tr>
+            <td class="key">UniFi Controller / UDM Pro</td>
+            <td class="desc">Managed switch/AP topology enrichment</td>
+          </tr>
+          <tr>
+            <td class="key">OPNsense <span class="type">(gateway)</span></td>
+            <td class="desc">Firewall leases, interface roster, and Suricata IDS alerts via REST API</td>
+          </tr>
+          <tr>
+            <td class="key">Firewalla MSP <span class="type">(gateway)</span></td>
+            <td class="desc">Cloud-managed device roster and alarm feed for Firewalla Gold / Purple / Blue Plus</td>
+          </tr>
+          <tr>
+            <td class="key">OpenVAS / Greenbone</td>
+            <td class="desc">CVE vulnerability scanning</td>
+          </tr>
+          <tr>
+            <td class="key">Elasticsearch</td>
+            <td class="desc">Long-term scan result storage</td>
+          </tr>
+          <tr>
+            <td class="key">Claude Code CLI or ANTHROPIC_API_KEY</td>
+            <td class="desc">Auto-integration generation for unknown devices</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 03 · LOCAL DEVELOPMENT                                             -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="local-dev">
+    <div class="section-header">
+      <div class="section-num">03</div>
+      <div class="section-title">Local <span class="accent">Development</span></div>
+    </div>
+
+    <p>Inside your own machine — before any of this hits real hardware — you're in the safe corner of the Grid. Hot reloads. Synthetic data. Every keystroke echoing back within milliseconds. The place where you build, and break, and build again.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Available Make Targets</div>
+      <table class="config-table">
+        <thead>
+          <tr><th>Command</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="key">make mock</td>
+            <td class="desc">Start both frontend + backend with mock data (recommended for development)</td>
+          </tr>
+          <tr>
+            <td class="key">make dev-backend</td>
+            <td class="desc">Backend only on port 8000 with <code>BACKEND_MOCK=true</code> and auto-reload</td>
+          </tr>
+          <tr>
+            <td class="key">make dev-frontend</td>
+            <td class="desc">Vite dev server on port 5173, proxies <code>/api</code> → <code>localhost:8000</code></td>
+          </tr>
+          <tr>
+            <td class="key">make build</td>
+            <td class="desc">TypeScript check + Vite production build into <code>frontend/dist/</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Manual Backend Start</div>
+      <p>If you need to pass custom environment variables, run the backend directly:</p>
+      <div class="code-block">
+        <div class="code-label">terminal</div>
+        <pre><span class="comment"># Create and activate venv (first time only)</span>
+<span class="prompt">$</span> <span class="cmd">cd backend</span>
+<span class="prompt">$</span> <span class="cmd">python3 -m venv .venv</span>
+<span class="prompt">$</span> <span class="cmd">source .venv/bin/activate</span>
+<span class="prompt">$</span> <span class="cmd">pip install -r requirements.txt</span>
+
+<span class="comment"># Mock mode (no real integrations)</span>
+<span class="prompt">$</span> <span class="cmd">BACKEND_MOCK=true DB_PATH=/tmp/homelab.db \
+    .venv/bin/uvicorn main:socket_app \
+    --host 0.0.0.0 --port 8000 --reload</span>
+
+<span class="comment"># Live mode with real scans</span>
+<span class="prompt">$</span> <span class="cmd">DB_PATH=/var/data/homelab.db \
+    ANTHROPIC_API_KEY=sk-ant-... \
+    .venv/bin/uvicorn main:socket_app \
+    --host 0.0.0.0 --port 8000</span></pre>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Manual Frontend Start</div>
+      <div class="code-block">
+        <div class="code-label">terminal</div>
+        <pre><span class="prompt">$</span> <span class="cmd">cd frontend</span>
+<span class="prompt">$</span> <span class="cmd">npm install</span>
+<span class="prompt">$</span> <span class="cmd">npm run dev</span>          <span class="comment"># dev server → http://localhost:5173</span>
+<span class="prompt">$</span> <span class="cmd">npm run build</span>        <span class="comment"># TypeScript check + production build</span></pre>
+      </div>
+    </div>
+
+    <div class="alert info">
+      <div class="alert-icon">▸</div>
+      <div>Vite quietly routes every <code>/api/*</code> and <code>/socket.io/*</code> packet through to the backend on <code>localhost:8000</code>. You only ever point your browser at port 5173. The plumbing is invisible — the way good plumbing always is.</div>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 04 · SETUP WIZARD                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="setup-wizard">
+    <div class="section-header">
+      <div class="section-num">04</div>
+      <div class="section-title">Setup <span class="accent">Wizard</span></div>
+    </div>
+
+    <p>First cycle on the Grid. Setup happens in two passes — compose-time and runtime — and each one owns its own territory. The bash wizard asks the bare minimum: where the server lives on the network, how the browser will reach it, whether TLS is in play. Once the stack is up, the in-app wizard opens and handles everything else: UniFi, Elasticsearch, OpenVAS, Claude. Gateway integrations — OPNsense, Firewalla — are opt-in, configurable from the Settings page at any time after the first launch; leave them dark and the Grid still runs on UniFi + Nmap alone. Secrets land in <code>config.yml</code>, not in shell env files. Two wizards, one Grid, no overlap.</p>
+
+    <div class="panel">
+      <div class="panel-title">◈ Wizard Steps</div>
+      <ol class="steps">
+        <li>
+          <div class="step-content">
+            <div class="step-title">Network</div>
+            <div class="step-desc">Declare the territory. CIDR range the scanner will sweep (e.g. <code>192.168.1.0/24</code>), the gateway that rules it. This is the map — the Grid needs to know where its edges are.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Elasticsearch</div>
+            <div class="step-desc">Long memory. Point to an existing Elasticsearch node (e.g. <code>http://elastic.local:9200</code>) and the dashboard will keep a record of every scan, every finding, every cycle. Test the link before you move on.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">UniFi Controller</div>
+            <div class="step-desc">The authority. UDM Pro or classic controller — url, credentials, site. Hit <strong>Test</strong> and the field transforms into a dropdown of real sites. No guessing. No typos. Pick the one that's yours.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Services</div>
+            <div class="step-desc">The specialists. OpenVAS for vulnerability sweeps. Claude for the programs you can't identify — fed by <code>ANTHROPIC_API_KEY</code> or the <code>claude</code> CLI. Each one's optional. Each one makes the Grid a little smarter.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Review &amp; Launch</div>
+            <div class="step-desc">Last look. Every value, laid out plain. Hit <strong>Launch Dashboard</strong> and the config drops to disk, the scheduler wakes, the first scan fires within seconds. You're in.</div>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="alert warn">
+      <div class="alert-icon">⚠</div>
+      <div>Flip <code>BACKEND_MOCK=true</code> and the wizard stands down. The backend declares <code>setup_complete: true</code> on boot and drops you straight onto the Grid. Useful for demos. Dangerous for production.</div>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 05 · PRODUCTION DEPLOY                                             -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="deploy">
+    <div class="section-header">
+      <div class="section-num">05</div>
+      <div class="section-title">Production <span class="accent">Deploy</span></div>
+    </div>
+
+    <p>Time to push the Grid out beyond the workstation. One command, one server, one stack. No ceremonies. No sudo waltzes. The script does the heavy lifting — you watch the lights come on.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Method A — deploy.sh (SSH + Docker Compose)</div>
+      <p>The clean line. A remote Ubuntu or Debian host, Docker already installed, and your SSH key on file. That's the whole shopping list.</p>
+      <div class="code-block">
+        <div class="code-label">terminal</div>
+        <pre><span class="comment"># Option A — positional argument (recommended)</span>
+<span class="prompt">$</span> <span class="cmd">./deploy.sh ubuntu@192.168.1.50</span>
+
+<span class="comment"># Option B — environment variables</span>
+<span class="prompt">$</span> <span class="cmd">DEPLOY_HOST=192.168.1.50 DEPLOY_USER=ubuntu ./deploy.sh</span>
+
+<span class="comment"># Option C — interactive prompt (no arguments)</span>
+<span class="prompt">$</span> <span class="cmd">./deploy.sh</span>
+<span class="comment"># → prompts: "Target host (user@ip or DEPLOY_USER@DEPLOY_HOST):"</span>
+
+<span class="comment"># The script will:</span>
+<span class="comment">#  1. Build frontend (npm run build)</span>
+<span class="comment">#  2. rsync project files to /opt/homelab-dashboard on the target</span>
+<span class="comment">#  3. Run docker compose up -d --build</span>
+<span class="comment">#  4. Poll /api/health until the stack reports healthy (60s timeout)</span>
+<span class="comment">#  5. Print the dashboard URL</span></pre>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Method B — Docker Compose Direct</div>
+      <div class="code-block">
+        <div class="code-label">terminal</div>
+        <pre><span class="comment"># Copy and fill in your environment file</span>
+<span class="prompt">$</span> <span class="cmd">cp .env.example .env</span>
+<span class="prompt">$</span> <span class="cmd">$EDITOR .env</span>
+
+<span class="comment"># Start core services</span>
+<span class="prompt">$</span> <span class="cmd">docker compose up -d</span>
+
+<span class="comment"># Start with NGINX Proxy Manager</span>
+<span class="prompt">$</span> <span class="cmd">docker compose --profile proxy up -d</span>
+
+<span class="comment"># Start with OpenVAS scanner</span>
+<span class="prompt">$</span> <span class="cmd">docker compose --profile openvas up -d</span>
+
+<span class="comment"># Full stack — all optional services</span>
+<span class="prompt">$</span> <span class="cmd">docker compose --profile proxy --profile openvas up -d</span>
+
+<span class="comment"># Check service health</span>
+<span class="prompt">$</span> <span class="cmd">docker compose ps</span>
+<span class="prompt">$</span> <span class="cmd">curl http://localhost:8000/api/health</span></pre>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Exposed Ports (defaults)</div>
+      <table class="config-table">
+        <thead>
+          <tr><th>Service</th><th>Port</th><th>Override</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="key">Frontend (Nginx)</td>
+            <td class="default">8080</td>
+            <td class="type">FRONTEND_PORT</td>
+          </tr>
+          <tr>
+            <td class="key">Backend (FastAPI)</td>
+            <td class="default">8000</td>
+            <td class="type">BACKEND_PORT</td>
+          </tr>
+          <tr>
+            <td class="key">NGINX Proxy Manager</td>
+            <td class="default">81</td>
+            <td class="type">NPM_PORT</td>
+          </tr>
+          <tr>
+            <td class="key">OpenVAS / Greenbone</td>
+            <td class="default">9392</td>
+            <td class="type">OPENVAS_HTTP_PORT</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="alert success">
+      <div class="alert-icon">✓</div>
+      <div>Before a single byte crosses the wire, <code>deploy.sh</code> runs its preflight: <code>rsync</code> present, Docker version acceptable, SSH reachable. Miss any one and it aborts with the reason spelled out. No half-transfers. No partial Grids.</div>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 06 · NETWORK MAP                                                   -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="network-map">
+    <div class="section-header">
+      <div class="section-num">06</div>
+      <div class="section-title">Network <span class="accent">Map</span></div>
+    </div>
+
+    <p>The main view. A living topology, every program on your network plotted in a single frame. Two cameras on the same data:</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Sphere · the 3D Grid</div>
+      <p>The landing shot. Devices arrange themselves on a glowing wireframe sphere using a Fibonacci distribution — even angular spacing at any node count, so ten devices look as composed as a hundred. Grab it, drag it, let go — the sphere spins with momentum and coasts to rest. Scroll to zoom in through the shell and out to the full Grid. An idle auto-rotation starts the moment you arrive and stops the moment you touch it.</p>
+      <p>Every label is billboarded with a horizon lock: the text yaws to face you but never pitches or rolls, so reading stays effortless no matter how the sphere is oriented. Labels on the far side of the sphere fade out so they don't bleed through. Device orbs pulse when selected; hovering scales them up. Critical CVEs paint the orb red, highs paint it orange, otherwise it's the usual online/offline/unknown palette.</p>
+      <p>The entire 3D engine (three.js + postprocessing, ~287 kB gzipped) lazy-loads on first visit to this page — it never ships with the initial bundle. On GPUs that struggle, a <code>PerformanceMonitor</code> dials the device pixel ratio down automatically; while you're actively orbiting, an <code>AdaptiveDpr</code> drop keeps frames fluid, then snaps back to sharpness when you release.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Flow · the 2D graph</div>
+      <p>The pragmatic view. React Flow renders nodes you can drag to reposition, with a minimap and pan/zoom controls. The gateway rides at the center of the Grid. Switches and access points orbit close — the infrastructure ring. Endpoints fan out past them in concentric circles. Node positions persist server-side, so your layout survives restarts.</p>
+      <p>Swap between views with the <strong>Sphere / Flow</strong> toggle in the top-right corner. Your preference persists to <code>localStorage</code>; the next session lands on whichever camera you left.</p>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">⬡</div>
+        <div class="feature-name">Device Nodes</div>
+        <div class="feature-desc">Every program wears its own glyph — router, server, camera, IoT, the works. IP addressed, status dotted. An orange badge counts open wounds (CVEs). A purple badge says Claude hasn't identified it yet.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">〜</div>
+        <div class="feature-name">Connections</div>
+        <div class="feature-desc">Lines drawn between devices are the circuits they run. Wired links hold steady cyan. Wireless links animate — a current you can almost see. Where UniFi is listening, the edges label themselves with the interface.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">◫</div>
+        <div class="feature-name">Detail Panel</div>
+        <div class="feature-desc">Click a program, the side panel slides in. IP, MAC, hostname, last seen, open services, vulnerability count, and a Scan button — one tap and you're poking at its ports directly.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">◈</div>
+        <div class="feature-name">Live Updates</div>
+        <div class="feature-desc">Socket.IO carries the news. A scan finishes — nodes appear, edges reroute, no refresh, no flicker. When a program goes dark, its status dot bleeds red and stays that way until it answers again.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">◢</div>
+        <div class="feature-name">Latency Readout</div>
+        <div class="feature-desc">A thin line chart anchored to the bottom-left corner. Round-trip time to the gateway, sampled every thirty seconds, traced across fifteen minutes to a full day. Pick a device, pick a window. You'll see the pulse of the Grid.</div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Node Status Indicators</div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+        <div><span class="badge badge-online">online</span> — Answered the last call</div>
+        <div><span class="badge badge-offline">offline</span> — Didn't answer. Silent on the wire.</div>
+        <div><span class="badge badge-unknown">unknown</span> — Seen, but not yet named</div>
+        <div><span class="badge badge-cyan">managed</span> — Vouched for by UniFi</div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Keyboard Controls</div>
+      <table class="config-table">
+        <thead><tr><th>Key / Action</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td class="key"><kbd>Scroll</kbd></td><td class="desc">Zoom in, zoom out. Closer to the metal or wider to the whole Grid.</td></tr>
+          <tr><td class="key"><kbd>Click + Drag</kbd> canvas</td><td class="desc">Pan the viewport. Slide across the topology.</td></tr>
+          <tr><td class="key"><kbd>Click</kbd> node</td><td class="desc">Pop the detail panel on the selected program.</td></tr>
+          <tr><td class="key"><kbd>+</kbd> / <kbd>−</kbd> buttons</td><td class="desc">Manual zoom — lower-left of the canvas.</td></tr>
+          <tr><td class="key">Fit button</td><td class="desc">Pull the whole Grid back into a single frame.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 07 · DEVICES                                                       -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="devices">
+    <div class="section-header">
+      <div class="section-num">07</div>
+      <div class="section-title"><span class="accent">Devices</span></div>
+    </div>
+
+    <p>The same programs. A different camera angle. Every device in a sortable ledger — filterable, searchable, bulk-reviewable. When you need the audit, not the poetry.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Filter Controls</div>
+      <ul>
+        <li><strong>Status filter</strong> — all / online / offline / unknown. Narrow the field.</li>
+        <li><strong>Search</strong> — IP, hostname, MAC, device type. Whatever you remember, it'll catch.</li>
+        <li><strong>Sort</strong> — by IP, by last seen, by CVE count. The noisiest programs rise to the top.</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Scan Column</div>
+      <p>The per-row <strong>Scan</strong> button — the fastest path from "I know which device I want" to "a scan is running against it." One click posts <code>/api/vulns/scan/{device_id}</code>; the button immediately flips through a little state machine so your click doesn't vanish into the void:</p>
+      <ul>
+        <li><strong>queueing → queued → running</strong> — a spinning pip on cyan. A toast fires the moment the scan is accepted.</li>
+        <li><strong>done</strong> — a green check. A second toast points you at the Vulnerabilities page for results.</li>
+        <li><strong>failed</strong> — a red retry button with the error in its tooltip. One more click reruns it.</li>
+        <li>If a device has no IP, the button disables with a tooltip explaining why — column alignment stays consistent.</li>
+      </ul>
+      <p>Completion rides the <code>scan:complete</code> socket event with the device id attached. If the event gets lost (socket reconnect, process restart), a 90-second TTL reverts the row to idle so you're never staring at a forever-spinner.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Device Detail Panel</div>
+      <p>Click a row. Same slide-in panel as the Map — the view just gets richer here:</p>
+      <ul>
+        <li><strong>Services</strong> — every open port the scanner found. Protocol, service name, version. Where a program speaks HTTP on a known UI, you get a launch link — one click straight to the console.</li>
+        <li><strong>Vulnerabilities</strong> — CVEs filed against this device. Expand a row for the full write-up, the CVSS band, remediation steps. Every CVE ID lands on its NVD entry.</li>
+        <li><strong>Scan</strong> — same per-device OpenVAS run as the column button, exposed inside the panel too.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 08 · VULNERABILITIES                                               -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="vulns">
+    <div class="section-header">
+      <div class="section-num">08</div>
+      <div class="section-title"><span class="accent">Vulnerabilities</span></div>
+    </div>
+
+    <p>The wounds OpenVAS finds, stacked across every program on the Grid. Each entry carries a CVSS v3 score — the system reads that number and picks the band. Red on top. You know the drill.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Severity Bands</div>
+      <table class="config-table">
+        <thead><tr><th>Badge</th><th>CVSS Range</th><th>Color</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge" style="color:#ff2a2a;border-color:rgba(255,42,42,0.4)">critical</span></td><td class="default">9.0 – 10.0</td><td class="desc">Red — the wolf is already inside. Fix now.</td></tr>
+          <tr><td><span class="badge" style="color:#ff8c00;border-color:rgba(255,140,0,0.4)">high</span></td><td class="default">7.0 – 8.9</td><td class="desc">Orange — days, not weeks.</td></tr>
+          <tr><td><span class="badge" style="color:#ffd700;border-color:rgba(255,215,0,0.4)">medium</span></td><td class="default">4.0 – 6.9</td><td class="desc">Yellow — patch on the next pass.</td></tr>
+          <tr><td><span class="badge" style="color:#39ff14;border-color:rgba(57,255,20,0.4)">low</span></td><td class="default">0.1 – 3.9</td><td class="desc">Green — for the record.</td></tr>
+          <tr><td><span class="badge badge-cyan">log</span></td><td class="default">0.0</td><td class="desc">Cyan — note, not wound.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Vuln Row Expansion</div>
+      <p>Click a vulnerability row. The full file opens up:</p>
+      <ul>
+        <li>The story — what it is, which build is bleeding</li>
+        <li>CVE badges — any ID clicks through to the NIST NVD entry</li>
+        <li>The exposed port and protocol</li>
+        <li>Remediation, straight from the OpenVAS advisory</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Scan Controls</div>
+      <ul>
+        <li><strong>Scan All Devices</strong> — queues an OpenVAS run against every program that's currently online</li>
+        <li><strong>Per-device scan</strong> — the Scan column on the Devices page (or the Scan button inside the detail panel). Surgical.</li>
+        <li>Progress rides Socket.IO back to the UI. No polling, no refresh, just watch the numbers climb.</li>
+      </ul>
+    </div>
+
+    <div class="alert warn">
+      <div class="alert-icon">⚠</div>
+      <div>Without credentials in <strong>scan_credentials</strong> (Settings → Credentials), OpenVAS runs blind — outside-looking-in. Feed it an SSH login and it goes <em>inside</em> the program. You want the inside view. That's where the real story is.</div>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 09 · CLAUDE INTEGRATION                                            -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="claude">
+    <div class="section-header">
+      <div class="section-num">09</div>
+      <div class="section-title"><span class="accent">Claude</span> Integration</div>
+    </div>
+
+    <p>Every so often the scanner meets a stranger — a program with no known signature. The Grid doesn't shrug. It hands the stranger to Claude. Ports, banners, OS guesses — Claude reads them like tea leaves, makes an identification, and writes a Python integration on the spot. You get the last word on whether it's kept.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Analysis Pipeline</div>
+      <ol class="steps">
+        <li>
+          <div class="step-content">
+            <div class="step-title">Unknown Device Detected</div>
+            <div class="step-desc">After every Nmap pass, the unclassifieds get funneled into <code>run_analysis_for_unknown_devices()</code>. Anything already waiting in the review queue is left alone — no duplicates.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Claude Analysis</div>
+            <div class="step-desc">The full context — IP, ports, banners, OS guess — goes out as a structured prompt. Claude comes back with a name for the stranger and an <code>integration.py</code> carrying <code>DEVICE_TYPE</code>, <code>DEVICE_LABEL</code>, and an async <code>enrich(ip)</code>. A program built to understand programs.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Staged Change Created</div>
+            <div class="step-desc">The new file lands in a sandbox, not the live tree. A record drops into the database; <code>claude:staged</code> fires over the socket; the notification banner glows at the top of the dashboard. Nothing's loose yet.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Review in Audit Log</div>
+            <div class="step-desc">Head to <strong>Audit Log → Change History</strong>. Expand the row. You'll see what Claude saw, the diff it wrote (colored up), and every file slated for deployment.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Approve or Reject</div>
+            <div class="step-desc"><strong>Approve</strong> — the integration file graduates out of the sandbox and into <code>INTEGRATIONS_DIR</code> (default <code>~/homelab-dashboard/integrations/devices/</code>). <strong>Reject</strong> — marked, and the sandbox is wiped. Either way, the audit log remembers.</div>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Claude CLI vs SDK Fallback</div>
+      <table class="config-table">
+        <thead><tr><th>Method</th><th>Requirement</th><th>Behavior</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="key">Claude CLI</td>
+            <td class="type"><code>claude</code> in PATH</td>
+            <td class="desc">First choice. <code>claude --print --allowedTools Write,Edit,Read</code> runs in the sandbox, full Claude Code context. Sharpest result.</td>
+          </tr>
+          <tr>
+            <td class="key">Anthropic SDK</td>
+            <td class="type"><code>ANTHROPIC_API_KEY</code> set</td>
+            <td class="desc">Fallback — Messages API, <code>claude-opus-4-7</code>. The runner pulls the first Python block out of the response. Still good.</td>
+          </tr>
+          <tr>
+            <td class="key">Placeholder</td>
+            <td class="type">Neither available</td>
+            <td class="desc">Last resort. A stub <code>integration.py</code> with <code>TODO</code> markers, still staged. You finish it by hand — the pipeline refuses to drop the stranger on the floor.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Audit Log Tabs</div>
+      <ul>
+        <li><strong>Change History</strong> — every staged change (pending, approved, rejected, applied). Expandable diff viewer. Device context attached.</li>
+        <li><strong>Audit Log</strong> — the immutable ledger. Who did what, when. No edits, no rewrites.</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">What Gets Logged</div>
+      <p>The Audit Log started life as a Claude-only ledger but now catches every meaningful UI mutation the Grid makes. Expand any row and the detail block humanises the event: which sections of the settings were touched, which hosts a credential test failed against, which device a scan fired at. Secrets (passwords, API keys, private keys) never make it to the log — only the non-secret fields around them.</p>
+      <table class="config-table">
+        <thead><tr><th>Action</th><th>Fires On</th></tr></thead>
+        <tbody>
+          <tr><td class="key">save_settings</td><td class="desc">Integration credentials saved via the setup wizard or Settings panel</td></tr>
+          <tr><td class="key">save_scan_intervals</td><td class="desc">Scheduler intervals changed</td></tr>
+          <tr><td class="key">save_scan_credential · delete_scan_credential</td><td class="desc">Per-target SSH credentials added or removed</td></tr>
+          <tr><td class="key">test_scan_credential</td><td class="desc">SSH auth probe run against a target — per-host results recorded, failed hosts surfaced</td></tr>
+          <tr><td class="key">trigger_job · pause_job · resume_job</td><td class="desc">Scheduler controls — which job, manually triggered or paused</td></tr>
+          <tr><td class="key">trigger_openvas_scan</td><td class="desc">One-off OpenVAS scan fired from a device card</td></tr>
+          <tr><td class="key">trigger_analysis · delete_analysis_report</td><td class="desc">AI Analysis runs and report removals</td></tr>
+          <tr><td class="key">reset_openvas_start · reset_openvas_success · reset_openvas_failed</td><td class="desc">The admin password reset flow — bookends the volume-wipe-and-recreate sequence</td></tr>
+          <tr><td class="key">openvas_auth_failed</td><td class="desc">Scheduler's scan job pre-flight — fires once when gvmd rejects stored credentials, before any device is scanned</td></tr>
+          <tr><td class="key">approve_claude_change · reject_claude_change · apply_claude_change</td><td class="desc">The original Claude approval lifecycle</td></tr>
+        </tbody>
+      </table>
+      <p>The log is intentionally capped at <strong>100 rows</strong>. Every write trims the oldest entries past the cap in the same transaction, so the ledger stays small and fast without a background job to prune it. If you need forever-history, Elasticsearch is the right destination — the Grid's audit log is designed for the last hundred actions, not the last hundred thousand.</p>
+    </div>
+
+    <div class="alert tip">
+      <div class="alert-icon">◈</div>
+      <div>The Claude Integration banner is a live signal — tap the ✕ and it goes quiet, but the staged change itself isn't going anywhere. It'll be waiting in the Audit Log when you're ready.</div>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 10 · SECURITY & ALARMS                                             -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="security">
+    <div class="section-header">
+      <div class="section-num">10</div>
+      <div class="section-title"><span class="accent">Security</span> &amp; Alarms</div>
+    </div>
+
+    <p>The Grid watches its own perimeter. Suricata IDS drops on OPNsense. Firewalla MSP cloud alarms. Every gateway that cares to speak up gets its own feed into a single unified surface — the <strong>Security</strong> page, pinned to the sidebar behind the Bell icon. No separate dashboards, no tab-juggling. One inbox, sorted, deduplicated, live.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">The Bell</div>
+      <p>A quiet sentry in the sidebar. When there's nothing to say, it sits dark and still. When an alarm lands — Suricata rule fires, Firewalla flags a new device, anything the gateway thought worth a siren — a red dot blooms in the upper-right of the icon. The count rides along with it, capped at <code>99+</code> so a full-blown alert storm doesn't smear across the chrome. Hover for the exact count; click to walk into the feed.</p>
+      <p>The indicator is driven by the <code>alarm:summary</code> socket channel — the server pushes the unacknowledged count the moment anything ticks it up or down, and a 60-second poll is the background safety net in case a socket drops. The badge is always honest within a second of the truth.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Severity Bands</div>
+      <p>Five tiers, Tron-palette, matching the Vulnerabilities page vocabulary so the eye doesn't have to relearn the lights on every page:</p>
+      <table class="config-table">
+        <thead><tr><th>Severity</th><th>Color</th><th>What It Means</th></tr></thead>
+        <tbody>
+          <tr><td class="key">critical</td><td class="default">red</td><td class="desc">Active exploit or confirmed compromise. Treat as an incident.</td></tr>
+          <tr><td class="key">high</td><td class="default">orange</td><td class="desc">Targeted malicious traffic. Suricata priority 1, Firewalla security-activity types.</td></tr>
+          <tr><td class="key">medium</td><td class="default">yellow</td><td class="desc">Suspicious but not yet actionable. Port scans, reputation hits, unusual flow volumes.</td></tr>
+          <tr><td class="key">low</td><td class="default">green</td><td class="desc">Noise-floor. New device joined, low-confidence signature, informational IDS category.</td></tr>
+          <tr><td class="key">info</td><td class="default">slate</td><td class="desc">Pure informational. Box came online, health ping, scheduled event.</td></tr>
+        </tbody>
+      </table>
+      <p>Suricata priorities translate cleanly: 1→critical, 2→high, 3→medium, 4→low. Firewalla alarms carry a numeric <code>type</code> code instead of a severity field — the backend maps the catalogue (security activity, intrusion, open port, new device, etc.) onto the same five-tier vocabulary so both sources sort against each other without asterisks.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Source Chips</div>
+      <p>Every row carries a chip that names who raised it — <span class="type">opnsense</span> (green) for Suricata-fed alerts, <span class="type">firewalla</span> (red) for MSP cloud alarms. The filter at the top of the page narrows the feed by source, by severity, or by acknowledged state. Nothing gets hidden by default — <em>unacknowledged</em> and <em>acknowledged</em> both show, and the toggle to reveal dismissed items is one click.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Deduplication</div>
+      <p>Gateways are generous with repetition. A single scanning host will spray the same Suricata rule dozens of times a minute; a Firewalla on a flaky ISP will re-fire a New-Device alarm every time the MAC reassociates. The Grid collapses these into a single row with a visible <code>seen × N</code> counter and the most recent timestamp. The fingerprint for the collapse is deterministic:</p>
+      <ul>
+        <li><strong>OPNsense / Suricata</strong> — <code>src_ip | dst_ip | signature | minute_bucket</code></li>
+        <li><strong>Firewalla</strong> — <code>gid | device_mac | type_code | minute_bucket</code></li>
+      </ul>
+      <p>Two alarms that match on every dimension within the same minute become one row with an incremented counter. Next minute, new row. Storms stay loud enough to notice; volume never drowns the signal.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Row Actions</div>
+      <p>Every row is an expandable card. The collapsed view shows severity, source, a one-line message, the device (if one could be pinned), and the relative timestamp. Click to expand and the raw gateway payload unfolds underneath — the full JSON as it came off the wire, pretty-printed for eyeballing. No hidden fields, no "contact support for details." What the gateway said is what you see.</p>
+      <p>Three actions live on every row:</p>
+      <ul>
+        <li><strong>Acknowledge</strong> — "I've seen this." The row stays in the feed, the unacked counter ticks down, the sidebar Bell loses one from its badge. Reversible — ack again to unack.</li>
+        <li><strong>Dismiss</strong> — "Not worth my time." The row is hidden from the default view but not deleted; flip <em>Include dismissed</em> to audit what got swept.</li>
+        <li><strong>Archive dismissed</strong> — the one nuclear option, up by the filter row. Wipes dismissed alarms from the database outright. Logged to the audit trail; no undo.</li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Live Updates</div>
+      <p>The feed is real-time. When a gateway raises a new alarm, the backend emits <code>alarm:new</code> on the socket and the page slides the fresh row to the top without a reload. <code>alarm:summary</code> rides alongside and updates both the sidebar badge and the six stat cards at the top of the page (Total, Unacknowledged, Critical, High, Medium, Low) in the same beat. A 60-second React Query poll runs underneath as insurance — if the socket drops, the UI is still honest within a minute.</p>
+    </div>
+
+    <div class="alert info">
+      <div class="alert-icon">▸</div>
+      <div>No gateway configured? The Security page still loads with an empty state — it's always in the nav so the surface is discoverable. Configure OPNsense or Firewalla under Settings → Gateway Integrations and the feed begins populating on the next poll cycle.</div>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 11 · SETTINGS                                                      -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="settings">
+    <div class="section-header">
+      <div class="section-num">11</div>
+      <div class="section-title"><span class="accent">Settings</span></div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Scheduler Panel</div>
+      <p>The Grid runs on clocks. Six of them, listed here with their next firing time:</p>
+      <table class="config-table">
+        <thead><tr><th>Job</th><th>Default Interval</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="key">nmap_scan</td>
+            <td class="default">Every 15 min</td>
+            <td class="desc">Walks the configured CIDR, finds every program, updates the topology. Any stranger it turns up gets handed to Claude.</td>
+          </tr>
+          <tr>
+            <td class="key">unifi_poll</td>
+            <td class="default">Every 30 sec</td>
+            <td class="desc">Pulls the managed client list off the UniFi controller — hostnames, switch ports, AP associations. Puts names to the wire.</td>
+          </tr>
+          <tr>
+            <td class="key">latency_poll</td>
+            <td class="default">Every 30 sec</td>
+            <td class="desc">TCP-taps the gateway and infrastructure devices, logs the round-trip. Feeds the latency chart on the Network Map. Prunes anything older than 24 hours.</td>
+          </tr>
+          <tr>
+            <td class="key">opnsense_poll</td>
+            <td class="default">Every 60 sec</td>
+            <td class="desc">Hits the OPNsense REST API for the interface roster, ARP/DHCP leases, and (when IDS is enabled) fresh Suricata alerts. Merges leases into the device table and pushes alarms onto the Security feed. Only registered when an OPNsense credential is configured.</td>
+          </tr>
+          <tr>
+            <td class="key">firewalla_poll</td>
+            <td class="default">Every 120 sec</td>
+            <td class="desc">Hits the Firewalla MSP cloud API for the box roster, device list, and active alarms. Cursor-paginates until the feed is drained. Same dedup + alarm pipeline as OPNsense. Dormant when Firewalla is disabled or configured in local-only mode.</td>
+          </tr>
+          <tr>
+            <td class="key">openvas_scan</td>
+            <td class="default">Every 24 hrs</td>
+            <td class="desc">The deep pass. Vulnerability scans against everything online. Findings land in the database and <code>vuln:updated</code> lights up the UI.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Need it now? Hit <strong>Run Now</strong> on any row. The schedule keeps ticking; the job just gets an early bell.</p>
+      <p>Need it <em>stopped</em>? Hit <strong>Pause</strong>. The job disappears from the firing schedule but stays listed with a <code>paused</code> badge — <strong>Run Now</strong> still works for one-off runs. <strong>Resume</strong> puts it back on the clock. Pauses are in-memory: a backend restart un-pauses everything, which is deliberate. If you want a scheduled job off permanently, change its interval, don't pause it.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Scan Intervals</div>
+      <p>Every interval is an input box. Change the number, hit save — the scheduler reprograms itself in place. No restart, no downtime.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Integration Credentials</div>
+      <p>UniFi, Elasticsearch, OpenVAS — each one gets its own panel. Type in the host, user, password. Hit <strong>Test</strong> to bounce a real authenticated call at the target — UniFi logs in and returns the site list, Elasticsearch pings its cluster endpoint, OpenVAS opens a GMP session and calls <code>authenticate</code>. A green pill means the Grid can actually <em>use</em> the credentials, not just reach the port. Hit <strong>Save</strong> to drop the value into <code>config.yml</code>. Leave a password field empty and the stored value stays put — no need to retype what's already on the wire.</p>
+      <p><strong>OpenVAS is the exception.</strong> The Grid is the only thing that ever talks to gvmd, so asking you to curate a password you'll never see is a tax. On first setup the backend rolls a 32-character URL-safe secret (~190 bits of entropy), persists it to <code>config.yml</code>, and feeds it to the container. The Settings panel shows a <em>Managed automatically</em> pill and a <strong>Rotate</strong> button — one click and the flow below runs with a freshly generated password. You never see it, type it, or lose it.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Gateway Integrations</div>
+      <p>A card below the core integrations, dedicated to the boxes that sit at the edge of the network — the ones doing firewalling and IDS. Two subsections, one per vendor, each independently enable-able. Configure neither and the Security page sits empty but discoverable. Configure one, the other, or both, and the alarm feed wakes up.</p>
+      <p><strong>OPNsense.</strong> URL, API key, API secret — generated under <em>System → Access → Users → API keys</em> on the firewall itself. <em>Verify SSL</em> defaults off so the typical self-signed deployment works out of the gate; tighten it when you have a proper cert. <em>IDS enabled</em> is the switch that makes the scheduler walk the Suricata alerts endpoint on each poll — flip it off if you just want interface and lease data. <em>Poll interval</em> is seconds, default 60. Hit <strong>Test</strong> and the backend opens a session, reads firmware version and hostname, and hands the result back as proof the credentials resolve.</p>
+      <p><strong>Firewalla.</strong> Two modes, one toggle. <em>MSP</em> (recommended) talks to Firewalla's cloud API — enter the MSP domain (e.g. <code>mydomain.firewalla.net</code>) and a Personal Access Token minted from the MSP dashboard. <em>Local</em> is the experimental path for users who only want to talk to the box directly on the LAN; the Firewalla local API is undocumented and volatile, so the card carries a warning and the integration ships as scaffold-only — <strong>Test</strong> succeeds but the poll returns empty snapshots until the schema solidifies. <em>Alarms enabled</em> gates the alarm fetch independently of device enrichment. <em>Poll interval</em> is seconds, default 120 — Firewalla's cloud API isn't latency-critical and aggressive polling risks rate limiting.</p>
+      <p>Both cards use the same secret-preservation rule as the core integrations: blank the API secret or token field, hit save, and the stored value stays put. The UI shows <em>(unchanged)</em> as a placeholder so it's visually obvious the old value is still in play.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Rotate OpenVAS Admin Password</div>
+      <p>The <code>immauss/openvas</code> image reads <code>PASSWORD</code> from the environment exactly once — the first time it boots against a fresh volume. After that, the env var is inert. Rotation means giving the image a clean slate with a fresh password baked into <code>PASSWORD</code>. Since the password is auto-managed, you don't type anything — just confirm you want to cycle it.</p>
+      <p>The escape hatch lives under the OpenVAS panel: <strong>Rotate</strong>. One button, one confirmation. The Grid generates a new secret, warns you about the wipe, and runs the flow:</p>
+      <ol class="steps">
+        <li>
+          <div class="step-content">
+            <div class="step-title">Snapshot &amp; Stop</div>
+            <div class="step-desc">The backend inspects <code>homelab-openvas</code>, captures the full container config — image, env, ports, labels, networks, restart policy, DNS aliases — then stops and removes the container.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Wipe the Volume</div>
+            <div class="step-desc">Removes the named data volume (<code>homelab-dashboard_openvas-data</code>). NVT feed cache, scan history, stored reports — all gone. The only way to get <code>PASSWORD</code> re-read is to give the image a clean slate.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Recreate</div>
+            <div class="step-desc">New container, same name, same everything — except <code>USERNAME</code> and <code>PASSWORD</code> are set to the freshly generated secret. Network aliases (<code>openvas</code>, <code>homelab-openvas</code>) are re-applied so DNS still resolves after the reset.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Warmup &amp; Verify</div>
+            <div class="step-desc">First-boot NVT sync takes 5–10 minutes. The modal tracks a progress bar driven by the <code>openvas:reset</code> socket channel, polling <code>authenticate</code> every 15 seconds until gvmd accepts the new password. 15-minute timeout — on the other side of it, either success or a clean error.</div>
+          </div>
+        </li>
+        <li>
+          <div class="step-content">
+            <div class="step-title">Persist</div>
+            <div class="step-desc">Only after gvmd has authenticated with the new password does the Grid write it to <code>config.yml</code>. A failed reset leaves your stored password untouched — whatever was working before still works.</div>
+          </div>
+        </li>
+      </ol>
+      <p>The whole flow writes <code>reset_openvas_start</code>, <code>reset_openvas_success</code>, or <code>reset_openvas_failed</code> rows into the Audit Log. You can close the modal and the reset keeps running in the background; the status pills keep ticking until <code>ready</code>.</p>
+      <div class="alert warn">
+        <div class="alert-icon">⚠</div>
+        <div>This is destructive. Scan history, vulnerability reports, and the NVT feed cache are all wiped. Vulnerability findings already persisted to <strong>our</strong> SQLite database survive — the Vulnerabilities page keeps its history. But anything inside the OpenVAS volume itself is gone. Use this when authentication is genuinely broken, not as a routine password change.</div>
+      </div>
+      <div class="alert tip">
+        <div class="alert-icon">◈</div>
+        <div>Requires docker socket access from inside the backend container. <code>docker-compose.yml</code> mounts <code>/var/run/docker.sock</code> read-write and adds <code>group_add: [${DOCKER_GID}]</code>. Set <code>DOCKER_GID</code> in your <code>.env</code> to your host's docker group id (<code>getent group docker</code>) — typically <strong>999</strong> on Debian/Ubuntu, <strong>988</strong> on RHEL/Fedora.</div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Scan Credentials</div>
+      <p>The second layer of authentication. <code>OPENVAS_USER / OPENVAS_PASSWORD</code> above is how the Grid <em>talks to the scanner</em>. <strong>Scan Credentials</strong> are how the scanner talks to <em>your devices</em>. Drop an SSH login here — password or private key — keyed to a target IP, and OpenVAS performs a credentialed scan. A proper interior walk-through rather than a port-knock from the outside.</p>
+      <p>The <strong>Auth Type</strong> dropdown flips the row between <em>password</em> and <em>key</em>. Pick <em>key</em> and the form swaps to a PEM textarea plus an optional passphrase field — paste the full private key (OpenSSH or PKCS#8, whatever your agent emits) and the Grid wires it straight into the GMP <code>USERNAME_SSH_KEY</code> credential object. Passwords land as <code>USERNAME_PASSWORD</code>. Same table, same UI — OpenVAS doesn't know the difference when the scan runs.</p>
+      <p>Use <code>*</code> as the target IP for a wildcard default applied to any device that doesn't have a more specific entry. You can also use CIDR ranges or dashed ranges (<code>192.168.1.10-20</code>) — <strong>Test Credentials</strong> expands them, fires an SSH auth probe at every resulting host, and drops a persistent badge next to the row. Green reads <code>OK · N/M hosts</code>. Red reads <code>at least one credential failed</code> and the detail — which IPs, which error — lands in the Audit Log for the post-mortem.</p>
+      <p>Each row is list / add / delete. No passwords or keys are ever shown back. The store lives in the local <code>scan_credentials</code> SQLite table (no sidecar, no vault, just plaintext inside the project's data volume).</p>
+      <div class="alert warn">
+        <div class="alert-icon">⚠</div>
+        <div>Without a scan credential, OpenVAS sees exactly what an attacker on your LAN would — port banners and whatever the service greets strangers with. That's useful, but shallow. A credentialed scan reaches the package list, the kernel version, the real inventory. If you want deep findings, feed the Grid a login.</div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Scan Profiles</div>
+      <table class="config-table">
+        <thead><tr><th>Profile</th><th>Nmap Flags</th><th>Use When</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="key">quick</td>
+            <td class="type"><code>-T4 -F</code></td>
+            <td class="desc">Sprint — the top 100 ports, nothing else. Use it when you need to poll often and cheap.</td>
+          </tr>
+          <tr>
+            <td class="key">standard</td>
+            <td class="type"><code>-T4 -sV</code></td>
+            <td class="desc">The default gait. Every port, with version detection. What the scheduler runs unless told otherwise.</td>
+          </tr>
+          <tr>
+            <td class="key">deep</td>
+            <td class="type"><code>-T3 -sV -O -A</code></td>
+            <td class="desc">Full X-ray. OS fingerprinting, aggressive detection, the works. Slow — but this is what gives Claude something to read.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 12 · CONFIG REFERENCE                                              -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="config-ref">
+    <div class="section-header">
+      <div class="section-num">12</div>
+      <div class="section-title">Config <span class="accent">Reference</span></div>
+    </div>
+
+    <p>Everything on the Grid bends to environment variables. Copy <code>.env.example</code> to <code>.env</code>, fill in the blanks, and the stack builds itself around your answers.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Core Variables</div>
+      <table class="config-table">
+        <thead>
+          <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="key">BACKEND_MOCK</td>
+            <td class="default">false</td>
+            <td class="desc">Enable mock mode. Loads fixture data, disables all real integrations, bypasses setup wizard.</td>
+          </tr>
+          <tr>
+            <td class="key">DB_PATH</td>
+            <td class="default">/data/homelab.db</td>
+            <td class="desc">SQLite database file path. Set to a local path (e.g. <code>/tmp/homelab.db</code>) for development.</td>
+          </tr>
+          <tr>
+            <td class="key">FRONTEND_PORT</td>
+            <td class="default">8080</td>
+            <td class="desc">Host port that maps to the frontend container's Nginx. The container still listens on 80 internally.</td>
+          </tr>
+          <tr>
+            <td class="key">BACKEND_PORT</td>
+            <td class="default">8000</td>
+            <td class="desc">Uvicorn port for the FastAPI backend container.</td>
+          </tr>
+          <tr>
+            <td class="key">INTEGRATIONS_DIR</td>
+            <td class="default">~/homelab-dashboard/integrations/devices</td>
+            <td class="desc">Directory where approved Claude-generated integration files are deployed.</td>
+          </tr>
+          <tr>
+            <td class="key">DEPLOY_DIR</td>
+            <td class="default">~/homelab-dashboard</td>
+            <td class="desc">Remote deploy path. Defaults to <code>$HOME/homelab-dashboard</code> on the target server — no sudo required. Override if deploying to a custom path.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Claude / AI Variables</div>
+      <table class="config-table">
+        <thead>
+          <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="key">ANTHROPIC_API_KEY</td>
+            <td class="default">—</td>
+            <td class="desc">Anthropic API key for SDK fallback. If unset and <code>claude</code> CLI is not in PATH, a placeholder file is generated.</td>
+          </tr>
+          <tr>
+            <td class="key">CLAUDE_NONINTERACTIVE</td>
+            <td class="default">1 (auto-set)</td>
+            <td class="desc">Set automatically when invoking the Claude CLI subprocess. Disables interactive prompts.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Optional Service Variables</div>
+      <table class="config-table">
+        <thead>
+          <tr><th>Variable</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="key">OPENVAS_HOST</td><td class="desc">Hostname/IP of the GVM/OpenVAS management daemon (port 9390). Leave unset for the default (<code>homelab-openvas</code>, the container name) — Settings owns this value once it's been saved in the UI, and a non-empty env var would otherwise clobber it on every backend restart.</td></tr>
+          <tr><td class="key">OPENVAS_USER / OPENVAS_PASSWORD</td><td class="desc">GMP authentication credentials</td></tr>
+          <tr><td class="key">DOCKER_GID</td><td class="desc">Host's docker group id — used by the backend to own the mounted docker socket (<code>/var/run/docker.sock</code>) for the OpenVAS reset flow. <code>getent group docker</code> to find it. Typically <strong>999</strong> (Debian/Ubuntu) or <strong>988</strong> (RHEL/Fedora).</td></tr>
+          <tr><td class="key">UNIFI_URL</td><td class="desc">UniFi Controller or UDM Pro base URL (e.g. <code>https://192.168.1.1</code>)</td></tr>
+          <tr><td class="key">UNIFI_USER / UNIFI_PASSWORD</td><td class="desc">UniFi admin credentials</td></tr>
+          <tr><td class="key">UNIFI_SITE</td><td class="desc">UniFi site name (default: <code>default</code>)</td></tr>
+          <tr><td class="key">ES_HOST / ES_PORT</td><td class="desc">Elasticsearch host and port for scan history (e.g. <code>192.168.1.100</code> / <code>9200</code>)</td></tr>
+          <tr><td class="key">ES_USER / ES_PASS</td><td class="desc">Elasticsearch credentials (leave blank for unauthenticated clusters)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 13 · ARCHITECTURE                                                  -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="architecture">
+    <div class="section-header">
+      <div class="section-num">13</div>
+      <div class="section-title">System <span class="accent">Architecture</span></div>
+    </div>
+
+    <div class="arch-diagram">
+<pre>
+<span class="arch-line-muted">                         ┌─────────────────────────────────┐</span>
+<span class="arch-line-muted">                         │         BROWSER CLIENT          │</span>
+<span class="arch-line-muted">                         │   React 18 · Vite · TypeScript  │</span>
+<span class="arch-line-cyan">                         │  ┌──────────┐  ┌────────────┐  │</span>
+<span class="arch-line-cyan">                         │  │ React    │  │  Socket.IO │  │</span>
+<span class="arch-line-cyan">                         │  │  Query   │  │   Client   │  │</span>
+<span class="arch-line-cyan">                         │  └────┬─────┘  └─────┬──────┘  │</span>
+<span class="arch-line-muted">                         └───────┼──────────────┼──────────┘</span>
+<span class="arch-line-muted">                    REST /api/*  │              │  ws events</span>
+<span class="arch-line-muted">        ┌───────────────────────▼──────────────▼───────────────────────┐</span>
+<span class="arch-line-white">        │                   FASTAPI  BACKEND                           │</span>
+<span class="arch-line-muted">        │           python-socketio  ·  uvicorn  ·  aiosqlite          │</span>
+<span class="arch-line-cyan">        │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐  │</span>
+<span class="arch-line-cyan">        │  │ /devices │  │  /vulns  │  │ /claude  │  │ /scheduler │  │</span>
+<span class="arch-line-cyan">        │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └─────┬──────┘  │</span>
+<span class="arch-line-muted">        │       │              │              │               │         │</span>
+<span class="arch-line-muted">        │  ┌────▼──────────────▼──────┐  ┌───▼───────────────▼──────┐ │</span>
+<span class="arch-line-orange">        │  │    device_service        │  │   claude_analysis        │ │</span>
+<span class="arch-line-orange">        │  │    topology_service      │  │   claude_runner          │ │</span>
+<span class="arch-line-orange">        │  │    vuln_service          │  │   notification_service   │ │</span>
+<span class="arch-line-muted">        │  └────┬──────────────┬──────┘  └──────────────────────────┘ │</span>
+<span class="arch-line-muted">        │       │   APScheduler │ jobs                                  │</span>
+<span class="arch-line-muted">        │  ┌────▼──┐  ┌────────▼───────┐  ┌─────────┐  ┌───────────┐ │</span>
+<span class="arch-line-green">        │  │ SQLite│  │  nmap_scan_job │  │ unifi_  │  │ openvas_  │ │</span>
+<span class="arch-line-green">        │  │  DB   │  │  (every 15 min)│  │ poll_job│  │ scan_job  │ │</span>
+<span class="arch-line-green">        │  │       │  │   latency_poll │  │ (30 sec)│  │ (24 hrs)  │ │</span>
+<span class="arch-line-muted">        │  └───────┘  └────────────────┘  └─────────┘  └───────────┘ │</span>
+<span class="arch-line-muted">        └───────────────────────────────────────────────────────────────┘</span>
+<span class="arch-line-muted">               │                  │               │             │</span>
+<span class="arch-line-muted">         ┌─────▼──┐        ┌──────▼──────┐  ┌────▼─────┐ ┌────▼──────┐</span>
+<span class="arch-line-cyan">         │  Nmap  │        │   UniFi     │  │ OpenVAS  │ │  Claude   │</span>
+<span class="arch-line-cyan">         │ (local)│        │ Controller  │  │ GVM/GSAD │ │ CLI / SDK │</span>
+<span class="arch-line-muted">         └────────┘        └─────────────┘  └──────────┘ └───────────┘</span>
+<span class="arch-line-muted">                                                              │</span>
+<span class="arch-line-muted">                                                    ┌─────────▼─────────┐</span>
+<span class="arch-line-orange">                                                    │  INTEGRATIONS_DIR │</span>
+<span class="arch-line-muted">                                                    │  (approved files) │</span>
+<span class="arch-line-muted">                                                    └───────────────────┘</span>
+</pre>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Data Flow — Network Scan</div>
+      <p>
+        <strong>Nmap scan</strong> → <code>merge_nmap_result()</code> upserts device records in SQLite →
+        <code>build_topology_graph()</code> constructs edges → <code>topology:updated</code> socket event →
+        React Query invalidates → React Flow re-renders graph.
+        Unknown devices → <code>run_analysis_for_unknown_devices()</code> → Claude pipeline (async) →
+        <code>claude:staged</code> socket event → notification banner.
+      </p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Data Flow — Vulnerability Scan</div>
+      <p>
+        <code>openvas_scan_job</code> iterates online devices → <code>run_openvas_scan(device_id, ip)</code> →
+        GMP session: create credential → create target → start task → poll → parse XML report →
+        <code>INSERT OR IGNORE INTO vuln_results</code> → <code>vuln:updated</code> socket event →
+        VulnsPage invalidates queries → CVE rows render.
+      </p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Data Flow — Latency</div>
+      <p>
+        <code>latency_poll_job</code> selects gateway + infrastructure devices →
+        concurrent TCP connects on port 443 → 80 → 22 → 53 (timeout 2s) →
+        RTT written to <code>latency_samples</code> → samples older than 24 hours pruned.
+        The <code>LatencyChart</code> component polls <code>GET /api/network/latency</code> every 30 seconds
+        and redraws its SVG path.
+      </p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Database Schema (SQLite)</div>
+      <table class="config-table">
+        <thead><tr><th>Table</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td class="key">devices</td><td class="desc">All discovered network devices, metadata, last seen timestamp</td></tr>
+          <tr><td class="key">device_services</td><td class="desc">Open ports and service details per device</td></tr>
+          <tr><td class="key">scan_results</td><td class="desc">Per-scan summary records (type, status, target count, result count)</td></tr>
+          <tr><td class="key">latency_samples</td><td class="desc">RTT samples per device (ts, latency_ms, success) — fuels the latency chart. Auto-pruned at 24h.</td></tr>
+          <tr><td class="key">vuln_results</td><td class="desc">OpenVAS CVE findings with CVSS scores, port, CVE IDs</td></tr>
+          <tr><td class="key">scan_credentials</td><td class="desc">SSH credentials for credentialed OpenVAS scans (per target IP)</td></tr>
+          <tr><td class="key">claude_staged_changes</td><td class="desc">Pending/approved/rejected Claude integration proposals</td></tr>
+          <tr><td class="key">audit_log</td><td class="desc">Rolling event log (capped at 100 rows) — settings saves, scan credential mutations, scheduler triggers, OpenVAS resets, Claude approve/reject/apply, and more</td></tr>
+          <tr><td class="key">scheduler_state</td><td class="desc">Last run timestamp and status for each background job</td></tr>
+          <tr><td class="key">config</td><td class="desc">Setup wizard output — all integration credentials and settings</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- 14 · UNDEPLOY / DE-REZ                                             -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <section class="section" id="undeploy">
+    <div class="section-header">
+      <div class="section-num">14</div>
+      <div class="section-title"><span class="accent">Undeploy</span> / De-Rez</div>
+    </div>
+
+    <p>Sometimes the Grid has to come down. A clean slate. A quiet host. This is the process for that — a surgical teardown that de-rezzes the dashboard stack and leaves every other program on the box untouched.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">Running the Script</div>
+      <p>Same host-resolution rules as <code>deploy.sh</code> — positional, env vars, or interactive prompt. The script never guesses.</p>
+      <div class="code-block">
+        <div class="code-label">terminal</div>
+        <pre><span class="comment"># Option A — positional</span>
+<span class="prompt">$</span> <span class="cmd">./undeploy.sh ubuntu@192.168.1.50</span>
+
+<span class="comment"># Option B — environment variables</span>
+<span class="prompt">$</span> <span class="cmd">DEPLOY_HOST=192.168.1.50 DEPLOY_USER=ubuntu ./undeploy.sh</span>
+
+<span class="comment"># Option C — interactive</span>
+<span class="prompt">$</span> <span class="cmd">./undeploy.sh</span>
+
+<span class="comment"># Skip the confirmation (destructive — know what you're doing)</span>
+<span class="prompt">$</span> <span class="cmd">./undeploy.sh ubuntu@192.168.1.50 --yes</span>
+
+<span class="comment"># Also purge upstream images (openvas, npm)</span>
+<span class="prompt">$</span> <span class="cmd">./undeploy.sh ubuntu@192.168.1.50 --purge-images</span></pre>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">What Gets De-Rezzed</div>
+      <p>Before anything is torn down, the script surveys the host and shows you exactly what it's about to erase. You'll get a preview, a warning, and a prompt to type <strong>YES</strong> before any destruction begins.</p>
+      <table class="config-table">
+        <thead><tr><th>Target</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="key">homelab-* containers</td>
+            <td class="desc">Stopped and removed. Every container prefixed <code>homelab-</code>, including any left over from renamed project dirs.</td>
+          </tr>
+          <tr>
+            <td class="key">Project volumes</td>
+            <td class="desc"><code>homelab-dashboard_*</code> volumes — <strong>destroyed</strong>. Database, NPM state, OpenVAS feed cache. Gone.</td>
+          </tr>
+          <tr>
+            <td class="key">Built images</td>
+            <td class="desc"><code>homelab-dashboard-frontend</code> and <code>homelab-dashboard-backend</code> images are removed. Layer cache freed.</td>
+          </tr>
+          <tr>
+            <td class="key">Upstream images</td>
+            <td class="desc">Left in place by default (they're reusable). Pass <code>--purge-images</code> to also remove <code>immauss/openvas</code> and <code>jc21/nginx-proxy-manager</code>.</td>
+          </tr>
+          <tr>
+            <td class="key">Deploy directory</td>
+            <td class="desc"><code>$HOME/homelab-dashboard</code> (or <code>DEPLOY_DIR</code>) — recursively removed. Compose file, config, local DB — all wiped.</td>
+          </tr>
+          <tr>
+            <td class="key">Docker networks</td>
+            <td class="desc">The project bridge is cleaned up via <code>docker network prune</code>. Other networks on the host are left alone.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">What Stays Untouched</div>
+      <ul>
+        <li>Every other Docker project on the host — their containers, volumes, and images are never named by this script.</li>
+        <li>System packages. No <code>apt</code> runs here. No user accounts modified.</li>
+        <li>The Docker daemon itself. It keeps running.</li>
+        <li>Your SSH config, firewall rules, and anything outside the deploy directory.</li>
+      </ul>
+    </div>
+
+    <div class="alert warn">
+      <div class="alert-icon">⚠</div>
+      <div>This is destructive by design. The volumes go with the containers — every device history, every CVE record, every staged Claude change that hasn't been applied. If any of that matters, back up the deploy directory first. The script will ask you once; when you type YES, the Grid goes dark.</div>
+    </div>
+  </section>
+
+  <div class="section-rule"><div class="section-rule-icon">◆ ◆ ◆</div></div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- FOOTER                                                             -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <footer class="footer">
+    <div class="footer-title">Homelab Dashboard — Flynn Archive</div>
+    <div>Six-phase build · React 18 + FastAPI · Socket.IO · Claude Code Integration</div>
+    <div style="margin-top:8px;color:var(--border);letter-spacing:0.1em;">
+      ◆ &nbsp; END OF LINE &nbsp; ◆
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

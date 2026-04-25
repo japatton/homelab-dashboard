@@ -1,0 +1,209 @@
+# Pin the project name so `docker compose` always groups these containers
+# under the same project/volume set regardless of which directory the user
+# ran the command from. Without this, running compose from a renamed dir
+# creates a second parallel stack with fresh volumes (and a fresh setup wizard).
+name: homelab-dashboard
+
+# Default logging for all services: cap per-container disk at ~30 MB
+# (3 files × 10 MB) so a runaway log line can't fill a small VM's rootfs.
+# Individual services can override with their own `logging:` block.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # One-shot sidecar that reconciles /data ownership before the backend
+  # starts. Needed for in-place upgrades from the old root-owned image —
+  # the new backend runs as uid/gid 1000 and would otherwise hit EACCES
+  # on /data. Exits 0 once the chown is done; backend `depends_on` this
+  # service completing successfully.
+  #
+  # On a fresh install this is a no-op (image-supplied /data is already
+  # owned 1000:1000). Idempotent either way.
+  data-init:
+    image: busybox:1.37
+    container_name: homelab-data-init
+    command: ["sh", "-c", "chown -R 1000:1000 /data && echo 'data-init: ok'"]
+    volumes:
+      - homelab-data:/data
+    restart: "no"
+    logging: *default-logging
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: homelab-backend
+    restart: unless-stopped
+    depends_on:
+      data-init:
+        condition: service_completed_successfully
+    # Bind host-side to BACKEND_BIND (default ""="all interfaces" for
+    # backwards compatibility; set BACKEND_BIND=127.0.0.1: in .env for
+    # production so only the frontend nginx — same docker network — can
+    # reach the backend. The API is then unreachable from LAN except via
+    # the dashboard, which is what you usually want. The trailing colon
+    # is significant: docker compose needs "127.0.0.1:8000:8000".
+    ports:
+      - "${BACKEND_BIND:-}${BACKEND_PORT:-8000}:8000"
+    environment:
+      - BACKEND_MOCK=${BACKEND_MOCK:-false}
+      - CONFIG_PATH=/data/config.yml
+      - DB_PATH=/data/homelab.db
+      - UNIFI_URL=${UNIFI_URL:-}
+      - UNIFI_USER=${UNIFI_USER:-}
+      - UNIFI_PASS=${UNIFI_PASS:-}
+      - UNIFI_SITE=${UNIFI_SITE:-default}
+      - ES_HOST=${ES_HOST:-}
+      - ES_PORT=${ES_PORT:-9200}
+      - ES_USER=${ES_USER:-}
+      - ES_PASS=${ES_PASS:-}
+      # NOTE: intentionally NOT set here. The backend's _load_from_env
+      # treats any non-empty OPENVAS_HOST as a hard override of the saved
+      # config, so hardcoding it (as we used to) silently reverts the host
+      # field in Settings on every container restart. Let the schema
+      # default ("homelab-openvas") apply on first boot; after that the
+      # user owns the value via the Settings UI. Users who genuinely want
+      # to override via env can still set OPENVAS_HOST in their .env.
+      - OPENVAS_HOST=${OPENVAS_HOST:-}
+      - OPENVAS_PORT=${OPENVAS_PORT:-9390}
+      - OPENVAS_USER=${OPENVAS_USER:-admin}
+      - OPENVAS_PASS=${OPENVAS_PASS:-}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
+      - CLAUDE_ENABLED=${CLAUDE_ENABLED:-false}
+      - DOMAIN_MODE=${DOMAIN_MODE:-ip}
+      - EXTERNAL_HOST=${EXTERNAL_HOST:-localhost}
+      - CERT_TYPE=${CERT_TYPE:-none}
+      - NMAP_TARGETS=${NMAP_TARGETS:-}
+      # Where Claude-generated device integrations are persisted on the host.
+      # Must NOT collide with the `integrations` Python package at /app/integrations.
+      - INTEGRATIONS_DIR=/data/generated-integrations
+      # Skip .pyc writes — otherwise a read-only root FS floods the log
+      # with "unable to write cache" warnings on every cold import.
+      - PYTHONDONTWRITEBYTECODE=1
+    volumes:
+      - homelab-data:/data
+      # Mounted so the backend can recreate the openvas container from
+      # Settings ("Reset Admin Password"). See services/openvas_reset.py.
+      # Read-write because volume-remove + container-create require it.
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Add the host's docker group so the non-root backend user can rwx the
+    # socket. Set DOCKER_GID in .env to your host's `getent group docker`
+    # GID (typically 999 on Debian/Ubuntu, 988 on RHEL/Fedora). Without this
+    # the socket mount is present but the backend gets EACCES when trying
+    # to talk to dockerd.
+    group_add:
+      - "${DOCKER_GID:-999}"
+    # Defence in depth: read-only root FS + scratch tmpfs means a RCE
+    # can't persist anywhere except /data (which is already owned by the
+    # user's data). no-new-privileges blocks setuid escalation if we ever
+    # accidentally ship a suid binary. Drop all Linux caps — we don't
+    # bind privileged ports or raw sockets from this process.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - homelab-net
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: homelab-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - homelab-net
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: homelab-npm
+    restart: unless-stopped
+    profiles:
+      - proxy
+    ports:
+      - "${NPM_HTTP_PORT:-80}:80"
+      - "${NPM_HTTPS_PORT:-443}:443"
+      - "${NPM_ADMIN_PORT:-81}:81"
+    volumes:
+      - npm-data:/data
+      - npm-letsencrypt:/etc/letsencrypt
+    networks:
+      - homelab-net
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:81"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  openvas:
+    # Pinned to a real, dated tag from https://hub.docker.com/r/immauss/openvas/tags
+    # rather than :latest. immauss uses YY.MM.DD.NN tags, not semver — the one
+    # below is Feb 28 2026, the most recent tag that's had a couple of months
+    # to stabilise in the wild. Upgrading: list tags above, pick a new one, test
+    # locally (OpenVAS reset flow + a real scan), then update here AND the
+    # fallback in services/openvas_reset.py::_snapshot_config. Never use :latest
+    # — upstream can land a breaking change to bcrypt cost, socket path, or GVM
+    # major version on any push and silently wreck the reset flow.
+    image: immauss/openvas:26.02.28.01
+    container_name: homelab-openvas
+    restart: unless-stopped
+    profiles:
+      - openvas
+    ports:
+      - "${OPENVAS_HTTP_PORT:-9392}:9392"
+    environment:
+      - USERNAME=${OPENVAS_USER:-admin}
+      - PASSWORD=${OPENVAS_PASS:-changeme}
+    volumes:
+      - openvas-data:/data
+    networks:
+      - homelab-net
+    logging: *default-logging
+    healthcheck:
+      # Probe gvmd's OSP/GMP port (9390) — that's the one the backend
+      # actually talks to. 9392 was the old web UI port (now gone in this
+      # image) so the previous healthcheck never reflected whether the
+      # scanner was ready, only whether nginx inside the container was up.
+      # `bash -c` + /dev/tcp is used because this image ships without curl.
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/9390' >/dev/null 2>&1"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 300s   # first-boot NVT sync needs ~5-10 min
+
+volumes:
+  homelab-data:
+  npm-data:
+  npm-letsencrypt:
+  openvas-data:
+
+networks:
+  homelab-net:
+    driver: bridge
