@@ -1,6 +1,6 @@
 # Pin exact node + nginx versions so a silent upstream retag can't break
 # reproducibility. Bump intentionally after local verification.
-FROM node:20.18.1-slim AS build
+FROM node:20.19.6-slim AS build
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-FROM nginx:1.27.3-alpine AS runtime
+FROM nginx:1.29.8-alpine AS runtime
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf

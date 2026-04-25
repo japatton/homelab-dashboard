@@ -25,12 +25,28 @@ export default defineConfig({
     // gzipped) loads lazily alongside GridSphere instead of blocking the
     // initial app shell. React + ReactFlow ship on first paint; three only
     // downloads when the user opens the topology page.
+    //
+    // Vite 8 swapped Rollup for Rolldown, which requires `manualChunks` to
+    // be a function (the object-shorthand form was a Rollup-only sugar).
+    // We rebuild the same buckets via id-substring matching so the output
+    // chunk graph stays identical.
     rollupOptions: {
       output: {
-        manualChunks: {
-          three: ['three', '@react-three/fiber', '@react-three/drei', '@react-three/postprocessing'],
-          reactflow: ['reactflow'],
-          vendor: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (
+              id.includes('/three/') ||
+              id.includes('/@react-three/')
+            ) return 'three'
+            if (id.includes('/reactflow/') || id.includes('/@reactflow/')) return 'reactflow'
+            if (
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/react-router-dom/') ||
+              id.includes('/@tanstack/react-query/')
+            ) return 'vendor'
+          }
+          return undefined
         },
       },
     },

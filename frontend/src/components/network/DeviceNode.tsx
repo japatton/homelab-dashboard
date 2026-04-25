@@ -3,11 +3,12 @@ import { Handle, Position } from 'reactflow'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Router, Network, Wifi, Server, Monitor, Laptop,
-  Camera, Cpu, Smartphone, CircleHelp, Bell, ShieldAlert
+  Camera, Cpu, Smartphone, CircleHelp, Bell, ShieldAlert,
+  type LucideIcon,
 } from 'lucide-react'
 import type { NodeData } from '../../types/topology'
 
-const deviceIcons: Record<string, React.ElementType> = {
+const deviceIcons: Record<string, LucideIcon> = {
   gateway:     Router,
   switch:      Network,
   ap:          Wifi,

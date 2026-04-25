@@ -72,6 +72,13 @@ updates:
       include: scope
 
   # Docker base images
+  #
+  # Pinning policy: stay on the current LTS-equivalent line. Dependabot will
+  # propose patch/security bumps on the same major (e.g. python:3.12.x) but
+  # we ignore major and minor bumps so we don't get pulled onto pre-release
+  # or odd-numbered release lines (Python 3.14 pre-release, Node 25 non-LTS).
+  # When we're ready to move to a new line, bump the FROM tag manually and
+  # the patch updates resume on the new major.
   - package-ecosystem: docker
     directory: /backend
     schedule:
@@ -85,6 +92,13 @@ updates:
       - docker
     commit-message:
       prefix: "docker(backend)"
+    ignore:
+      # Stay on Python 3.12.x line. 3.13 is current; 3.14 is pre-release.
+      # Re-evaluate yearly once a new line reaches "stable" status.
+      - dependency-name: "python"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
 
   - package-ecosystem: docker
     directory: /frontend
@@ -99,3 +113,9 @@ updates:
       - docker
     commit-message:
       prefix: "docker(frontend)"
+    ignore:
+      # Stay on Node LTS (even-numbered majors). Don't follow odd majors like
+      # 21/23/25 which are short-lived "Current" releases.
+      - dependency-name: "node"
+        update-types:
+          - "version-update:semver-major"
