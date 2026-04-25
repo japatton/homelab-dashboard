@@ -9,7 +9,7 @@
  *   - useToast() outside a provider returns a no-op API (doesn't throw
  *     so components are robust in half-wired trees / early tests).
  */
-import { render, renderHook, screen, waitForElementToBeRemoved } from '@testing-library/react'
+import { render, renderHook, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
@@ -64,13 +64,14 @@ describe('ToastProvider + useToast', () => {
     expect(title).toBeInTheDocument()
 
     await userEvent.click(screen.getByLabelText('Dismiss'))
-    // AnimatePresence keeps the toast mounted during its 200ms exit
-    // animation. waitForElementToBeRemoved polls until the node is
-    // actually unmounted.
-    await waitForElementToBeRemoved(() => screen.queryByText('Scan queued'), {
-      timeout: 2000,
-    })
-    expect(screen.queryByText('Scan queued')).not.toBeInTheDocument()
+    // AnimatePresence may keep the toast mounted briefly during its exit
+    // animation, or in jsdom may remove it synchronously. waitFor with a
+    // not-in-document assertion handles both cases without erroring when
+    // the node has already been unmounted by the time we start polling.
+    await waitFor(
+      () => expect(screen.queryByText('Scan queued')).not.toBeInTheDocument(),
+      { timeout: 2000 },
+    )
   })
 
   it('useToast outside a provider is a safe no-op (does not throw)', () => {
