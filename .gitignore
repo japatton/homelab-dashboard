@@ -80,3 +80,6 @@ Desktop.ini
 # ── Claude / AI scratch ──────────────────────────────────────────────────
 .claude/
 .anthropic/
+
+# ── Code-review scratch (dual-persona review artifacts; uncommitted) ─────
+reviews/
