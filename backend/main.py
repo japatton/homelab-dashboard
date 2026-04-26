@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -23,9 +24,20 @@ logging.basicConfig(
 )
 
 # Socket.io server — shared via notification_service
+#
+# F-011: clamp Origin policy to the configured DASHBOARD_ALLOWED_ORIGINS
+# when set, mirroring the HTTP CORS middleware below. Wide-open "*" is
+# the documented LAN-mode default; once the operator sets origins for
+# tunnel exposure, socket.io should respect the same list (otherwise
+# the HTTP gate is tight and the WebSocket gate is sloppy).
+_socket_origins_env = os.getenv("DASHBOARD_ALLOWED_ORIGINS", "").strip()
+if _socket_origins_env:
+    _socket_cors = [o.strip() for o in _socket_origins_env.split(",") if o.strip()]
+else:
+    _socket_cors = "*"
 sio = socketio.AsyncServer(
     async_mode="asgi",
-    cors_allowed_origins="*",
+    cors_allowed_origins=_socket_cors,
     logger=False,
     engineio_logger=False,
 )
@@ -238,9 +250,57 @@ async def health():
 # Track which sids have already received the initial staged-change notification
 _notified_sids: set[str] = set()
 
+_socket_log = logging.getLogger("socket")
+
+
+def _extract_socket_token(environ: dict, auth: dict | None) -> str:
+    """Pull the dashboard token out of a socket.io handshake.
+
+    Two acceptance forms, in order of preference:
+
+      1. The client's `auth: { token: '<value>' }` field — the canonical
+         socket.io-client way to attach credentials. Travels in the
+         WebSocket upgrade frame, never in a URL.
+      2. An `Authorization: Bearer <value>` header from the upgrade
+         request — useful for libcurl-style clients and matches the
+         HTTP middleware's accepted shape.
+
+    No query-string fallback (F-005 rationale applies — tokens in URLs
+    leak). Returns the empty string when nothing was supplied.
+    """
+    if isinstance(auth, dict):
+        tok = auth.get("token")
+        if isinstance(tok, str) and tok:
+            return tok.strip()
+    raw = environ.get("HTTP_AUTHORIZATION", "")
+    if isinstance(raw, str) and raw.lower().startswith("bearer "):
+        return raw[7:].strip()
+    return ""
+
 
 @sio.event
-async def connect(sid, environ):
+async def connect(sid, environ, auth=None):
+    """Socket.io connect handler.
+
+    F-001: enforces the DASHBOARD_TOKEN gate at handshake time. The
+    middleware in middleware/auth.py only guards /api/* — socket.io
+    paths fall through unauth'd at the HTTP layer and have to be
+    gated here. When no token is configured (LAN mode), this is a
+    no-op auth-wise and the existing initial-emit logic runs.
+
+    Returning False from a python-socketio connect handler causes the
+    server to reject the WebSocket upgrade with a connect_error event
+    on the client side.
+    """
+    expected = get_dashboard_token()
+    if expected is not None:
+        supplied = _extract_socket_token(environ, auth)
+        if not supplied or not hmac.compare_digest(supplied, expected):
+            _socket_log.info(
+                "socket connect rejected for sid=%s (missing/invalid token)", sid
+            )
+            return False
+
     if _MOCK:
         from mock.topology_fixtures import MOCK_TOPOLOGY
 
@@ -253,7 +313,9 @@ async def connect(sid, environ):
                 await sio.emit("claude:staged", pending[0], to=sid)
                 _notified_sids.add(sid)
     else:
-        # Send current real topology on connect
+        # Send current real topology on connect. F-029: bare except: pass
+        # was hiding initial-topology-emit failures with zero log signal —
+        # users saw an empty graph and there was nothing to grep for.
         try:
             from services.device_service import get_all_devices
             from services.topology_service import build_topology_graph
@@ -263,8 +325,10 @@ async def connect(sid, environ):
                 topology = await build_topology_graph(devices)
                 ns = get_notification_service()
                 await ns.emit_topology_updated(topology, room=sid)
-        except Exception:
-            pass
+        except Exception as e:
+            _socket_log.warning(
+                "initial topology emit failed for sid=%s: %s", sid, e
+            )
 
 
 @sio.event
