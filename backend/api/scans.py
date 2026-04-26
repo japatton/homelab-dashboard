@@ -68,6 +68,21 @@ async def trigger_nmap(
     targets: Optional[list[str]] = Body(None),
     profile: ScanProfile = Body("standard"),
 ):
+    # F-003: validate target shapes at the API boundary so that anything
+    # starting with `-` (Nmap flag) or anything that doesn't look like a
+    # legitimate IPv4/CIDR/range/hostname gets rejected with 400. Without
+    # this, `targets=["-iL","/data/config.yml"]` makes Nmap dump the
+    # plaintext config into the scan output. validate_targets only runs
+    # when the caller actually supplied targets — when None, the default
+    # below is server-controlled and trusted.
+    from integrations.nmap import validate_targets, TargetValidationError
+
+    if targets is not None:
+        try:
+            validate_targets(targets)
+        except TargetValidationError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     job = ScanJob(
         id=str(uuid.uuid4()),
         scan_type="nmap",

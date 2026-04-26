@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import xml.etree.ElementTree as ET
 from typing import Optional
 
@@ -15,6 +16,67 @@ SCAN_PROFILES = {
     "standard": ["-T4", "-sV", "--open", "--version-intensity", "3"],
     "full": ["-T4", "-sV", "-sC", "--open", "--version-intensity", "5"],
 }
+
+# F-003: targets are appended to argv positionally, so any element
+# beginning with `-` is interpreted as a flag — `-iL <file>` reads
+# arbitrary files as target lists, `--script <name>` enables NSE
+# scripts, `-oN <file>` writes Nmap output anywhere the process can
+# write. This regex describes the legitimate shapes (single IPv4,
+# IPv4/CIDR, last-octet range a.b.c.x-y, DNS hostname). Anything
+# else gets rejected at the API boundary.
+#
+# Defense-in-depth: scan() also prefixes the target list with `--` in
+# argv so a future regex relaxation can't accidentally re-enable flag
+# injection. Both layers must fail for an attacker-controlled element
+# to land as a flag.
+_TARGET_RE = re.compile(
+    r"^(?:"
+    # IPv4 dotted quad, with optional /CIDR (0-32) or last-octet range
+    r"(?:[0-9]{1,3}(?:\.[0-9]{1,3}){3})"
+    r"(?:/(?:[0-9]|[1-2][0-9]|3[0-2])|-[0-9]{1,3})?"
+    r"|"
+    # DNS hostname — RFC 1035 conservative (letters, digits, hyphens,
+    # dots; not starting/ending with hyphen; up to 253 chars total)
+    r"(?=.{1,253}$)"
+    r"(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)"
+    r"(?:\.(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*"
+    r")$"
+)
+
+_TARGETS_MAX = 64
+
+
+class TargetValidationError(ValueError):
+    """Raised when a target list contains shapes that could be flag-
+    injected into Nmap. Callers should turn this into an HTTP 400.
+    """
+
+
+def validate_targets(targets: list[str]) -> None:
+    """Reject target lists that could become Nmap flags or that exceed
+    a sanity cap. Mutates nothing; raises TargetValidationError on the
+    first bad entry. Called from every public path that builds a
+    target list — both the API (api/scans.py) and the scheduler's
+    default-derivation path (scheduler/jobs.py).
+    """
+    if not isinstance(targets, list) or not targets:
+        raise TargetValidationError("targets must be a non-empty list")
+    if len(targets) > _TARGETS_MAX:
+        raise TargetValidationError(
+            f"too many targets ({len(targets)}); cap is {_TARGETS_MAX}"
+        )
+    for t in targets:
+        if not isinstance(t, str):
+            raise TargetValidationError(f"target must be a string, got {type(t)}")
+        s = t.strip()
+        if not s:
+            raise TargetValidationError("target may not be empty")
+        if s.startswith("-"):
+            # Catches any future regex relaxation that allows a leading
+            # dash; --script, -iL, -oN, -A all start with dashes.
+            raise TargetValidationError(f"target may not start with '-': {t!r}")
+        if not _TARGET_RE.match(s):
+            raise TargetValidationError(f"invalid target shape: {t!r}")
 
 
 class NmapIntegration(BaseIntegration):
@@ -43,11 +105,18 @@ class NmapIntegration(BaseIntegration):
         extra_args: Optional[list[str]] = None,
         timeout: int = 300,
     ) -> NmapResult:
+        # F-003 defence-in-depth: `--` tells Nmap "everything after this
+        # is a positional target, even if it looks like a flag." With
+        # validate_targets() at the API boundary AND `--` here, both
+        # layers have to fail before an attacker-controlled string can
+        # land as a flag. validate_targets is the primary gate; this is
+        # the backstop.
         args = ["nmap", "-oX", "-"] + SCAN_PROFILES.get(
             profile, SCAN_PROFILES["standard"]
         )
         if extra_args:
             args.extend(extra_args)
+        args.append("--")
         args.extend(targets)
 
         log.info("Nmap starting: %s", " ".join(args))

@@ -16,10 +16,28 @@ _MOCK = os.getenv("BACKEND_MOCK", "false").lower() == "true"
 
 
 def _default_scan_targets() -> list[str]:
-    """Derive scan targets from env. Prefer NMAP_TARGETS, then EXTERNAL_HOST /24."""
+    """Derive scan targets from env. Prefer NMAP_TARGETS, then EXTERNAL_HOST /24.
+
+    F-003: NMAP_TARGETS is operator-supplied and reaches Nmap's argv;
+    validate it the same way the API path does so a typo or a malicious
+    CI env var can't slip a `-iL /etc/...` into the scheduled scan.
+    Falls back to the hardcoded RFC1918 default on validation failure
+    (loud log line so the operator sees the rejection).
+    """
+    from integrations.nmap import validate_targets, TargetValidationError
+
     env_targets = os.getenv("NMAP_TARGETS", "").strip()
     if env_targets:
-        return [t.strip() for t in env_targets.split(",") if t.strip()]
+        candidates = [t.strip() for t in env_targets.split(",") if t.strip()]
+        try:
+            validate_targets(candidates)
+            return candidates
+        except TargetValidationError as e:
+            log.warning(
+                "NMAP_TARGETS env value rejected (%s) — falling back to "
+                "EXTERNAL_HOST-derived default. Fix .env if this was intentional.",
+                e,
+            )
 
     host = os.getenv("EXTERNAL_HOST", "").strip()
     # If EXTERNAL_HOST is an IPv4 address, derive its /24
