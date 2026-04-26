@@ -237,11 +237,32 @@ async def apply_change(
     """
     Copy approved generated files from sandbox to the integrations directory.
     Returns list of destination paths.
+
+    Path-injection guard (CodeQL py/path-injection / review F-022 hardening):
+    `generated_files` flows from the DB column `claude_staged_changes.generated_files`.
+    Today the only writer is server-internal (claude_runner.run_device_analysis),
+    so the values are trusted. But a future code path that lets an attacker
+    influence that JSON would otherwise let them copy arbitrary host files into
+    INTEGRATIONS_DIR. Defense-in-depth: resolve every src_path and require it
+    to live under sandbox_dir; skip with a warning otherwise. `Path.resolve()`
+    collapses any `..` traversal.
     """
     INTEGRATIONS_DIR.mkdir(parents=True, exist_ok=True)
+    sandbox_root = Path(sandbox_dir).resolve()
     copied = []
     for src_path in generated_files:
-        src = Path(src_path)
+        src = Path(src_path).resolve()
+        try:
+            # relative_to() raises ValueError on path escape (3.12+ has
+            # is_relative_to but we keep the older idiom for clarity).
+            src.relative_to(sandbox_root)
+        except ValueError:
+            log.warning(
+                "Generated file %s escapes sandbox %s; refusing to copy",
+                src,
+                sandbox_root,
+            )
+            continue
         if not src.exists():
             log.warning("Generated file missing: %s", src)
             continue
