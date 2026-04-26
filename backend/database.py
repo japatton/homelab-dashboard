@@ -207,6 +207,14 @@ CREATE INDEX IF NOT EXISTS idx_analysis_reports_generated ON analysis_reports(ge
 async def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
+        # F-004: SQLite defaults `foreign_keys = OFF`, which silently
+        # disables every ON DELETE CASCADE the schema declares — so up
+        # through v1.1.0 a deleted device's services / vulns / latency
+        # samples orphan forever. Turn the PRAGMA on once here for the
+        # init connection, and again in get_db() for every runtime
+        # connection (the PRAGMA is connection-scoped, not DB-scoped).
+        await db.execute("PRAGMA foreign_keys = ON")
+
         # Migrations that have to run BEFORE the schema executescript creates
         # the new UNIQUE index on vuln_results — otherwise the index creation
         # fails on any DB that already contains duplicate findings.
@@ -217,7 +225,70 @@ async def init_db() -> None:
         # change above is a no-op on upgraded DBs. _migrate_scan_credentials
         # backfills the missing columns with ALTER TABLE.
         await _migrate_scan_credentials(db)
+
+        # F-004 followup: clean up any orphaned rows that accumulated
+        # while foreign_keys was off. Audit-log the count so the
+        # operator sees what happened on the upgrade boot rather than
+        # discovering "the Vulnerabilities page lost rows" via support
+        # ticket. Delete BEFORE the commit so the cleanup is atomic
+        # with the schema apply.
+        orphan_counts = await _cleanup_orphans(db)
+
         await db.commit()
+
+    # Audit-log the cleanup outside the schema-init transaction so an
+    # audit-write failure doesn't roll back the schema migration.
+    if any(orphan_counts.values()):
+        try:
+            from services.audit_service import write_audit
+
+            await write_audit(
+                "foreign_key_cleanup",
+                "system",
+                {
+                    "rationale": (
+                        "F-004: PRAGMA foreign_keys=ON enabled; deleted rows "
+                        "orphaned by previous foreign_keys=OFF default"
+                    ),
+                    "orphans_removed": orphan_counts,
+                },
+            )
+        except Exception as e:
+            # Don't gate startup on audit-write hiccups.
+            import logging as _log
+
+            _log.getLogger(__name__).warning(
+                "audit_log write for foreign_key_cleanup failed: %s", e
+            )
+
+
+async def _cleanup_orphans(db: aiosqlite.Connection) -> dict[str, int]:
+    """Delete rows whose foreign-key parent no longer exists.
+
+    Runs in init_db() exactly once per process startup. Idempotent —
+    re-running on a clean DB is a no-op (every DELETE returns 0
+    rowcount). Returns counts per table for the audit-log entry so
+    the operator can see what got cleaned up on the upgrade boot.
+
+    The four child tables that reference devices(id):
+      - device_services  — ON DELETE CASCADE declared, never fired
+      - scan_results     — no cascade
+      - vuln_results     — no cascade
+      - latency_samples  — no cascade
+    """
+    out: dict[str, int] = {}
+    for table in (
+        "device_services",
+        "scan_results",
+        "vuln_results",
+        "latency_samples",
+    ):
+        cur = await db.execute(
+            f"DELETE FROM {table} "  # noqa: S608 - table name is hardcoded
+            f"WHERE device_id NOT IN (SELECT id FROM devices)"
+        )
+        out[table] = cur.rowcount or 0
+    return out
 
 
 async def _migrate_vuln_results(db: aiosqlite.Connection) -> None:
@@ -340,5 +411,12 @@ async def _migrate_scan_credentials(db: aiosqlite.Connection) -> None:
 @asynccontextmanager
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
     async with aiosqlite.connect(DB_PATH) as db:
+        # F-004: PRAGMA foreign_keys is connection-scoped, not
+        # database-scoped — every fresh aiosqlite.connect() comes back
+        # with foreign_keys=OFF regardless of what init_db did. Setting
+        # it here makes ON DELETE CASCADE actually fire for runtime
+        # writes. Cost is one round-trip per connection (~µs); worth
+        # it for not silently orphaning rows.
+        await db.execute("PRAGMA foreign_keys = ON")
         db.row_factory = aiosqlite.Row
         yield db
