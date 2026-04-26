@@ -326,9 +326,7 @@ async def connect(sid, environ, auth=None):
                 ns = get_notification_service()
                 await ns.emit_topology_updated(topology, room=sid)
         except Exception as e:
-            _socket_log.warning(
-                "initial topology emit failed for sid=%s: %s", sid, e
-            )
+            _socket_log.warning("initial topology emit failed for sid=%s: %s", sid, e)
 
 
 @sio.event

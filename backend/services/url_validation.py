@@ -57,11 +57,11 @@ class TargetValidationError(ValueError):
 # IPv4 / IPv6 networks we never let outbound requests touch, regardless
 # of how the operator configured the dashboard.
 _DENY_NETS_ALWAYS: tuple[ipaddress._BaseNetwork, ...] = (
-    ipaddress.ip_network("169.254.0.0/16"),    # IPv4 link-local + cloud IMDS
-    ipaddress.ip_network("0.0.0.0/8"),         # "this network" / unspecified
-    ipaddress.ip_network("fe80::/10"),         # IPv6 link-local
-    ipaddress.ip_network("ff00::/8"),          # IPv6 multicast
-    ipaddress.ip_network("::/128"),            # IPv6 unspecified
+    ipaddress.ip_network("169.254.0.0/16"),  # IPv4 link-local + cloud IMDS
+    ipaddress.ip_network("0.0.0.0/8"),  # "this network" / unspecified
+    ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
+    ipaddress.ip_network("ff00::/8"),  # IPv6 multicast
+    ipaddress.ip_network("::/128"),  # IPv6 unspecified
     ipaddress.ip_network("::ffff:169.254.0.0/112"),  # v4-mapped link-local
 )
 
@@ -176,6 +176,4 @@ def is_target_ok(host_or_url: str) -> bool:
 def _check_resolved_addrs(addrs: Iterable[ipaddress._BaseAddress]) -> None:
     for ip in addrs:
         if _is_denied(ip):
-            raise TargetValidationError(
-                f"resolved address {ip} is in a denied range"
-            )
+            raise TargetValidationError(f"resolved address {ip} is in a denied range")

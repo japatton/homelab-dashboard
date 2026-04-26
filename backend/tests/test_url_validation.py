@@ -133,7 +133,9 @@ class TestValidateOutboundTarget:
         assert validate_outbound_target("192.168.1.50:9200") == "192.168.1.50"
 
     def test_accepts_url_with_scheme(self):
-        assert validate_outbound_target("http://192.168.1.50:9200/_cat") == "192.168.1.50"
+        assert (
+            validate_outbound_target("http://192.168.1.50:9200/_cat") == "192.168.1.50"
+        )
 
     def test_rejects_aws_imds_literal(self):
         with pytest.raises(TargetValidationError) as ei:

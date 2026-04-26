@@ -9,7 +9,6 @@ from pydantic import SecretStr
 from config import get_config_manager
 from services.url_validation import (
     TargetValidationError,
-    parse_host,
     validate_outbound_target,
 )
 
