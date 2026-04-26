@@ -7,11 +7,39 @@ from fastapi import APIRouter, Body, HTTPException
 from pydantic import SecretStr
 
 from config import get_config_manager
+from services.url_validation import (
+    TargetValidationError,
+    parse_host,
+    validate_outbound_target,
+)
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/setup", tags=["setup"])
 
 _MOCK = _os.getenv("BACKEND_MOCK", "false").lower() == "true"
+
+
+def _gate(host_or_url: str) -> str:
+    """F-002: Apply outbound-target SSRF validation; on failure raise
+    the FastAPI HTTPException directly so each endpoint can use a
+    one-liner. Returns the parsed hostname for callers that want it.
+    """
+    try:
+        return validate_outbound_target(host_or_url)
+    except TargetValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+def _safe_400(action: str, e: Exception) -> HTTPException:
+    """F-027: Don't echo raw exception text back to the API caller —
+    response bodies and banner fragments can leak through stringified
+    httpx errors. Log the detail server-side and return a generic 400.
+    """
+    log.warning("%s failed: %s", action, e)
+    return HTTPException(
+        status_code=400,
+        detail=f"{action} failed — see server logs for detail",
+    )
 
 
 @router.get("/status")
@@ -31,14 +59,18 @@ async def test_elasticsearch(
 ):
     if not host:
         raise HTTPException(status_code=400, detail="Host is required")
+    parsed = _gate(host)  # F-002: SSRF allowlist
     try:
         import httpx
 
         auth = (user, password) if user else None
         async with httpx.AsyncClient(timeout=5.0) as c:
-            r = await c.get(f"http://{host}:{port}", auth=auth)  # type: ignore[arg-type]
+            r = await c.get(f"http://{parsed}:{port}", auth=auth)  # type: ignore[arg-type]
             if r.status_code < 500:
                 info = r.json()
+                # Extract specific known fields rather than echoing the
+                # full body — defence-in-depth even if the validator
+                # somehow let through a sensitive target (it shouldn't).
                 return {
                     "ok": True,
                     "version": info.get("version", {}).get("number", "unknown"),
@@ -49,7 +81,7 @@ async def test_elasticsearch(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _safe_400("test-elasticsearch", e)
 
 
 @router.post("/test-unifi")
@@ -61,6 +93,7 @@ async def test_unifi(
     """Auth against the UniFi controller and return the list of sites the
     user can see, so the wizard can show a dropdown instead of free-text.
     """
+    _gate(url)  # F-002: SSRF allowlist
     try:
         import httpx
 
@@ -112,7 +145,7 @@ async def test_unifi(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise _safe_400("test-unifi", e)
 
 
 @router.post("/test-opnsense")
@@ -141,6 +174,8 @@ async def test_opnsense(
                 detail="no API secret supplied and none stored — enter a secret first",
             )
 
+    _gate(url)  # F-002: SSRF allowlist
+
     integ = OPNsenseIntegration(
         url=url,
         api_key=api_key,
@@ -150,6 +185,10 @@ async def test_opnsense(
     )
     res = await integ.test_connection()
     if not res.ok:
+        # res.message is integration-source-faithful (parsed by the
+        # integration's own _safe_error sanitiser), so it's safe to
+        # bubble — the integration class is the one who knows whether
+        # gvmd / OPNsense / etc. error text contains banner fragments.
         raise HTTPException(status_code=400, detail=res.message)
     return {
         "ok": True,
@@ -190,6 +229,7 @@ async def test_firewalla(
                 status_code=400,
                 detail="no MSP token supplied and none stored — enter a token first",
             )
+        _gate(msp_domain)  # F-002: SSRF allowlist
         integ = FirewallaIntegration(
             mode="msp",
             msp_domain=msp_domain,
@@ -199,6 +239,7 @@ async def test_firewalla(
     else:
         if not local_url:
             raise HTTPException(status_code=400, detail="Local box URL required")
+        _gate(local_url)  # F-002: SSRF allowlist
         token = local_token or cfg.firewalla.local_token.get_secret_value()
         integ = FirewallaIntegration(
             mode="local",
@@ -246,6 +287,8 @@ async def test_openvas(
                 status_code=400,
                 detail="no password supplied and none stored — enter a password first",
             )
+
+    _gate(host)  # F-002: SSRF allowlist
 
     integ = OpenVASIntegration(host=host, port=port, username=user, password=pw)
     res = await integ.test_connection()
@@ -325,6 +368,8 @@ async def test_ollama(
     available model IDs. The frontend uses `model_present` to show whether
     the configured model name actually exists on the server."""
     from integrations.ollama import OllamaIntegration
+
+    _gate(host)  # F-002: SSRF allowlist (host may be a bare hostname or full URL)
 
     integ = OllamaIntegration(host=host, port=port, model=model, api_key=api_key)
     res = await integ.test_connection()
