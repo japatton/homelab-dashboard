@@ -168,10 +168,20 @@ async def lifespan(app: FastAPI):
         await close_es_client()
 
 
+# Disable FastAPI's auto-generated docs (/docs, /redoc, /openapi.json) when
+# DASHBOARD_TOKEN is set — those routes don't start with /api/ so the auth
+# middleware lets them through, and they publish the entire API surface map
+# (every endpoint, parameter shape, body field) to anonymous callers. That's
+# fine for local development (token unset) where Swagger is genuinely useful,
+# but it's a free attack-surface accelerant under tunnel exposure. F-007.
+_DOCS_DISABLED = get_dashboard_token() is not None
 app = FastAPI(
     title="Homelab Dashboard API",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
+    docs_url=None if _DOCS_DISABLED else "/docs",
+    redoc_url=None if _DOCS_DISABLED else "/redoc",
+    openapi_url=None if _DOCS_DISABLED else "/openapi.json",
 )
 
 # CORS: when DASHBOARD_TOKEN is set, clamp allow_origins to the configured

@@ -127,3 +127,26 @@ class TestAuthMiddlewareIntegration:
 
     def test_token_gate_leaves_health_open(self, api_client_with_token):
         assert api_client_with_token.get("/health").status_code == 200
+
+
+class TestDocsExposure:
+    """F-007: FastAPI's auto-generated docs (/docs, /redoc, /openapi.json)
+    don't start with /api/ so the auth middleware lets them through. They
+    publish the entire API surface map to anonymous callers — fine in
+    development (token unset) but free recon under tunnel exposure. We
+    flip them off when DASHBOARD_TOKEN is set."""
+
+    def test_docs_open_when_token_unset(self, api_client):
+        # api_client fixture leaves DASHBOARD_TOKEN unset → /docs reachable
+        # for local Swagger workflows.
+        assert api_client.get("/docs").status_code == 200
+        assert api_client.get("/openapi.json").status_code == 200
+
+    def test_docs_disabled_when_token_set(self, api_client_with_token):
+        # api_client_with_token sets DASHBOARD_TOKEN → /docs returns 404.
+        # Note: the routes are *not mounted*, so the response is FastAPI's
+        # default 404, not a 401 from the middleware (since the middleware
+        # only gates /api/*). 404 is correct: the routes don't exist.
+        assert api_client_with_token.get("/docs").status_code == 404
+        assert api_client_with_token.get("/redoc").status_code == 404
+        assert api_client_with_token.get("/openapi.json").status_code == 404
