@@ -1,10 +1,8 @@
 """Opt-in single-token auth.
 
 Set `DASHBOARD_TOKEN=<something-long>` in the backend env and every
-/api/* request (plus socket.io) must present it as:
+/api/* request must present it as:
     Authorization: Bearer <token>
-or
-    ?token=<token>   (for socket.io WebSocket handshake convenience)
 
 Unset → middleware is a no-op, current behaviour. This exists so the
 homelab dashboard can be safely exposed over a reverse proxy to the
@@ -13,8 +11,18 @@ an unauthenticated OpenVAS-reset button.
 
 Exempt paths (no token needed, in all cases):
   - GET /health   so external monitoring can still probe liveness
-  - any path starting with /socket.io (socket.io handshake has its own
-    token check in notification_service)
+  - any path starting with /socket.io — socket.io has its own connect-
+    handler token check in main.py (not a free pass; the @sio.event
+    `connect` validates the same token via the client's `auth: { token }`
+    handshake)
+
+NOTE on `?token=` query-param auth: previous versions accepted a `?token=`
+fallback "for socket.io WebSocket handshake convenience." That was
+removed: tokens in URLs leak via nginx access logs, browser history, and
+the HTTP Referer header on outbound clicks. Socket.io's `auth` field is
+the proper handshake mechanism and doesn't put the credential in a URL.
+If you were relying on `?token=`, switch the client to
+`io('/', { auth: { token } })`.
 
 NOTE: This is intentionally a single shared token, not per-user auth.
 The threat model is "gate the dashboard from drive-by access", not
@@ -64,8 +72,10 @@ class DashboardTokenMiddleware(BaseHTTPMiddleware):
         auth = request.headers.get("authorization", "")
         if auth.lower().startswith("bearer "):
             supplied = auth[7:].strip()
-        if not supplied:
-            supplied = request.query_params.get("token", "")
+        # Query-param fallback removed (F-005): tokens in URLs leak via
+        # access logs, browser history, and Referer. Socket.io's
+        # `auth: { token }` handshake is the supported alternative to
+        # the Authorization header.
 
         # constant-time compare to blunt timing oracles
         if not supplied or not hmac.compare_digest(supplied, self._token):

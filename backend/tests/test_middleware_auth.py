@@ -91,23 +91,25 @@ class TestSetToken:
             )
             assert r.status_code == 200, f"failed for scheme {scheme}"
 
-    def test_query_param_token(self, client: TestClient):
-        # ?token= is the socket.io handshake convenience path.
+    def test_query_param_token_rejected(self, client: TestClient):
+        # F-005: ?token= fallback was removed. Tokens in URLs leak via
+        # access logs, browser history, and Referer headers — even a
+        # correct token in a query parameter is now rejected. Clients
+        # must use the Authorization header (HTTP) or socket.io's
+        # `auth: { token }` handshake (WebSocket).
         r = client.get("/api/ping?token=s3cret-token")
-        assert r.status_code == 200
-
-    def test_wrong_query_param_token(self, client: TestClient):
-        r = client.get("/api/ping?token=wrong")
         assert r.status_code == 401
 
-    def test_blank_bearer_falls_back_to_query(self, client: TestClient):
-        # "Authorization: Bearer " with empty value must not short-circuit
-        # past the query-param fallback.
+    def test_blank_bearer_does_not_fall_back(self, client: TestClient):
+        # "Authorization: Bearer " with empty value used to fall back to
+        # ?token=; now it just fails with 401 regardless of whether a
+        # token is in the query string. Same root cause: no URL-shaped
+        # token paths, full stop.
         r = client.get(
             "/api/ping?token=s3cret-token",
             headers={"Authorization": "Bearer "},
         )
-        assert r.status_code == 200
+        assert r.status_code == 401
 
 
 class TestGetDashboardToken:
