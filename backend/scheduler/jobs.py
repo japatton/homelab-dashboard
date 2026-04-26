@@ -170,6 +170,7 @@ async def unifi_poll_job() -> None:
             username=cfg.unifi.user,
             password=cfg.unifi.password.get_secret_value(),
             site=cfg.unifi.site,
+            verify_ssl=cfg.unifi.verify_ssl,
         )
         # Hard cap the poll at 20s. Default interval is 30s, so without a
         # timeout a hung controller (cert expired, network partition,
@@ -490,11 +491,12 @@ async def openvas_scan_job() -> None:
     # Reachability probe: the OpenVAS container takes 5–10 min on first boot to
     # sync NVT feeds. Skip silently if it isn't listening yet instead of
     # spamming 'Connection refused' for every discovered device.
-    import asyncio as _asyncio
-
+    # F-043 cleanup: was importing `asyncio as _asyncio` here — redundant
+    # since the module-level `import asyncio` (top of file) is already in
+    # scope. Use the module-level alias.
     try:
-        _reader, _writer = await _asyncio.wait_for(
-            _asyncio.open_connection(cfg.openvas.host, cfg.openvas.port),
+        _reader, _writer = await asyncio.wait_for(
+            asyncio.open_connection(cfg.openvas.host, cfg.openvas.port),
             timeout=3.0,
         )
         _writer.close()
@@ -502,7 +504,7 @@ async def openvas_scan_job() -> None:
             await _writer.wait_closed()
         except Exception:
             pass
-    except (OSError, _asyncio.TimeoutError) as e:
+    except (OSError, asyncio.TimeoutError) as e:
         log.info("OpenVAS not reachable (%s) — skipping this run; retrying in 5m", e)
         await record_job_run(
             "openvas_scan",
@@ -573,21 +575,78 @@ async def openvas_scan_job() -> None:
 
     ns = get_notification_service()
     total_findings = 0
+    timed_out = 0
 
     for device in online:
-        try:
-            count = await run_openvas_scan(device.id, device.ip)  # type: ignore[arg-type]
-            if count > 0:
-                total_findings += count
-                await ns.emit_vuln_updated(device.id, {"count": count})
-        except Exception as e:
-            log.error("openvas_scan_job device %s failed: %s", device.id, e)
+        count, did_timeout = await _scan_one_device_with_timeout(
+            device.id,
+            device.ip,
+            ns=ns,
+            timeout_s=OPENVAS_PER_DEVICE_TIMEOUT_S,
+            scan_fn=run_openvas_scan,
+        )
+        total_findings += count
+        if did_timeout:
+            timed_out += 1
 
-    await record_job_run(
-        "openvas_scan",
-        "success",
-        f"{total_findings} findings across {len(online)} devices",
-    )
+    summary = f"{total_findings} findings across {len(online)} devices"
+    if timed_out:
+        summary += f" ({timed_out} timed out)"
+    await record_job_run("openvas_scan", "success", summary)
+
+
+# F-006: cap each per-device scan at 70 minutes — slightly longer than the
+# integration's internal 60-minute poll loop (integrations/openvas.py::_run_scan_sync)
+# so a normal long scan still completes, but a stuck gvmd response (TLS hang,
+# partial socket close) can't wedge the entire scheduled run for hours. Without
+# this, one ghost host could exhaust the 24-hour scheduler window and
+# apscheduler's max_instances=1 default would drop the next cycle.
+OPENVAS_PER_DEVICE_TIMEOUT_S = 70 * 60
+
+
+async def _scan_one_device_with_timeout(
+    device_id: str,
+    device_ip: str,
+    *,
+    ns,
+    timeout_s: int,
+    scan_fn,
+) -> tuple[int, bool]:
+    """Run a single per-device OpenVAS scan under an `asyncio.wait_for` cap.
+
+    Returns (findings_count, timed_out_flag). Pulled out of openvas_scan_job
+    as a separate helper so the timeout branch is reachable from tests
+    without spinning up the whole scheduler. `scan_fn` is the function
+    that does the actual scan (run_openvas_scan in production, a mock in
+    tests).
+    """
+    try:
+        count = await asyncio.wait_for(
+            scan_fn(device_id, device_ip),
+            timeout=timeout_s,
+        )
+        if count and count > 0:
+            await ns.emit_vuln_updated(device_id, {"count": count})
+            return (count, False)
+        return (0, False)
+    except asyncio.TimeoutError:
+        log.warning(
+            "openvas_scan_job device %s (%s) timed out after %d min — skipping",
+            device_id,
+            device_ip,
+            timeout_s // 60,
+        )
+        await ns.emit_scan_complete(
+            job_id=f"device:{device_id}",
+            scan_type="openvas",
+            device_count=0,
+            error=f"scan timed out after {timeout_s // 60} min",
+            device_id=device_id,
+        )
+        return (0, True)
+    except Exception as e:
+        log.error("openvas_scan_job device %s failed: %s", device_id, e)
+        return (0, False)
 
 
 async def daily_analysis_job() -> None:

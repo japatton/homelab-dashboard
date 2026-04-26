@@ -100,6 +100,12 @@ def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     We import `main` lazily inside the fixture so environment monkeypatches
     are applied before module import. The ASGI Socket.io wrapper isn't
     exercised here — TestClient drives the FastAPI app directly.
+
+    Both `database` and `main` are reloaded so that database.DB_PATH (set
+    at module-import time from $DB_PATH) re-binds to *this* test's
+    tmp_path — without that reload, the first test's DB_PATH stays
+    bound for the rest of the run and later tests' inserts go to the
+    wrong file.
     """
     monkeypatch.setenv("BACKEND_MOCK", "true")
     # Steer DB + config writes to the tmp dir even though mock mode
@@ -108,8 +114,10 @@ def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CONFIG_PATH", str(tmp_path / "api-config.yml"))
 
     from fastapi.testclient import TestClient
+    import database
     import main
 
+    importlib.reload(database)
     importlib.reload(main)
 
     with TestClient(main.app) as c:
@@ -118,15 +126,18 @@ def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 @pytest.fixture()
 def api_client_with_token(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    """TestClient with DASHBOARD_TOKEN set. Exercises the auth middleware."""
+    """TestClient with DASHBOARD_TOKEN set. Exercises the auth middleware.
+    Same reload-both rationale as api_client (see its docstring)."""
     monkeypatch.setenv("BACKEND_MOCK", "true")
     monkeypatch.setenv("DASHBOARD_TOKEN", "test-token-xyz")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("CONFIG_PATH", str(tmp_path / "config.yml"))
 
     from fastapi.testclient import TestClient
+    import database
     import main
 
+    importlib.reload(database)
     importlib.reload(main)
 
     with TestClient(main.app) as c:

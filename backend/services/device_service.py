@@ -693,3 +693,31 @@ def detect_unknown_devices(devices: list[Device]) -> list[Device]:
         for d in devices
         if d.device_type == "unknown" and len(d.services) > 0 and d.confidence < 0.3
     ]
+
+
+async def known_device_ips(ips: list[str]) -> set[str]:
+    """Return the subset of `ips` that's present in the devices table.
+
+    Used by the credential-test endpoint to gate the SSH-probe spray
+    surface (F-009 in reviews/FINAL_REPORT.md). Without this gate, a
+    token-bearing caller can probe arbitrary LAN IPs by submitting a
+    pattern like "10.0.0.1-32" — the dashboard would dutifully open
+    SSH connections to all of them. The fix bounds the allowed
+    targets to IPs the dashboard has already discovered (i.e. seen
+    via Nmap or a gateway integration). Discovery is operator-driven
+    so this naturally tracks the operator's intent.
+
+    Returns a set for cheap membership checks at the caller. Empty
+    list short-circuits with no DB round-trip.
+    """
+    if not ips:
+        return set()
+    placeholders = ",".join(["?"] * len(ips))
+    async with get_db() as db:
+        rows = await (
+            await db.execute(
+                f"SELECT ip FROM devices WHERE ip IN ({placeholders})",  # noqa: S608
+                ips,
+            )
+        ).fetchall()
+    return {r["ip"] for r in rows if r["ip"]}

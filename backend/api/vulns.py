@@ -306,8 +306,17 @@ async def test_credential(
     SSH auth against every resulting host. Returns overall ok/fail + per-host
     detail. Each run writes a summary audit entry so Settings mistakes are
     reviewable.
+
+    F-009: probe only IPs that already exist in the devices table. Without
+    this gate the endpoint is a token-gated SSH-spray + lateral-movement
+    primitive — the operator can probe arbitrary LAN IPs by submitting a
+    range pattern. Allowing only discovered devices bounds the surface to
+    targets the dashboard has actually seen (via Nmap / UniFi / OPNsense /
+    Firewalla). IPs not in the table are returned in `unknown_targets` so
+    the operator sees what was filtered.
     """
     from services.audit_service import write_audit
+    from services.device_service import known_device_ips
     from services.ip_expand import expand_targets, ExpandError
     from services.ssh_probe import probe_many
 
@@ -325,8 +334,25 @@ async def test_credential(
     except ExpandError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    # F-009: filter to IPs already in the devices table.
+    known = await known_device_ips(ips)
+    probe_ips = [ip for ip in ips if ip in known]
+    unknown_targets = [ip for ip in ips if ip not in known]
+
+    if not probe_ips:
+        # Nothing to probe — surface the gate as a 400 so the operator
+        # sees the rejection reason (vs a misleading "0 hosts tested").
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "no targets in the devices table — run a discovery scan "
+                "first or pick IPs the dashboard has already seen. "
+                f"Filtered out: {unknown_targets[:10]}"
+            ),
+        )
+
     results = await probe_many(
-        ips,
+        probe_ips,
         username,
         password=password or None,
         private_key=private_key or None,
@@ -343,6 +369,7 @@ async def test_credential(
         "ok_count": ok_count,
         "fail_count": len(results) - ok_count,
         "all_ok": all_ok,
+        "unknown_targets": unknown_targets,
         "results": per_host,
     }
     # One audit row per test — individual host lines are in `results` for
