@@ -88,16 +88,21 @@ async def test_unifi(
     url: str = Body(...),
     user: str = Body(...),
     password: str = Body(...),
+    verify_ssl: bool = Body(False),
 ):
     """Auth against the UniFi controller and return the list of sites the
     user can see, so the wizard can show a dropdown instead of free-text.
+
+    F-008: `verify_ssl` is now honoured here too, matching the schema's
+    UniFiConfig.verify_ssl field. Default stays False (UniFi ships
+    self-signed; toggling on requires a real cert on the controller).
     """
     _gate(url)  # F-002: SSRF allowlist
     try:
         import httpx
 
         async with httpx.AsyncClient(
-            verify=False, follow_redirects=True, timeout=8.0
+            verify=verify_ssl, follow_redirects=True, timeout=8.0
         ) as c:
             controller_type: str | None = None
             # Try UDM / UDM Pro first

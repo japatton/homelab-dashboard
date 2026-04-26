@@ -56,10 +56,24 @@ class UniFiTopology:
 class UniFiIntegration(BaseIntegration):
     name = "unifi"
 
-    def __init__(self, url: str, username: str, password: str, site: str = "default"):
+    def __init__(
+        self,
+        url: str,
+        username: str,
+        password: str,
+        site: str = "default",
+        verify_ssl: bool = False,
+    ):
         self._url = url.rstrip("/")
         self._username = username
         self._password = password
+        # F-008: the schema's UniFiConfig.verify_ssl was a placebo prior to
+        # this — the integration hard-coded verify=False, so flipping the
+        # toggle in Settings did nothing. Now plumbed end-to-end. Default
+        # remains False to match the schema default and the documented
+        # "UniFi ships self-signed by default" assumption; users with a
+        # real cert can opt in.
+        self._verify_ssl = verify_ssl
         # The value the user configured — may be a site ID ("default") OR a
         # human-readable display name ("Dream Machine Pro"). We resolve the
         # actual ID on first use via `_resolve_site()`.
@@ -187,7 +201,9 @@ class UniFiIntegration(BaseIntegration):
         self._site_resolved = True
 
     async def _client(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(verify=False, follow_redirects=True)
+        # F-008: honour the configured verify_ssl rather than hard-coding
+        # False. Mirrors what OPNsense and Firewalla already do.
+        return httpx.AsyncClient(verify=self._verify_ssl, follow_redirects=True)
 
     async def test_connection(self) -> ConnectionResult:
         try:

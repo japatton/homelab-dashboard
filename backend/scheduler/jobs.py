@@ -170,6 +170,7 @@ async def unifi_poll_job() -> None:
             username=cfg.unifi.user,
             password=cfg.unifi.password.get_secret_value(),
             site=cfg.unifi.site,
+            verify_ssl=cfg.unifi.verify_ssl,
         )
         # Hard cap the poll at 20s. Default interval is 30s, so without a
         # timeout a hung controller (cert expired, network partition,
