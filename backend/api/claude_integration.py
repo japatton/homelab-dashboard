@@ -171,6 +171,22 @@ async def reject_change(change_id: str):
             )
             await db.commit()
 
+        # F-022: clean up the staging sandbox on reject. apply_change does
+        # this on approve (shutil.rmtree at the end of the copy loop), but
+        # the reject path used to just flip the DB status — leaving the
+        # rejected proposal sitting on tmpfs forever. That's both a
+        # storage leak (each tempdir is small but unbounded) and a small
+        # defense-in-depth concern: rejected proposals can include
+        # banner-influenced LLM output that we explicitly don't want to
+        # keep around.
+        ctx = change.get("device_context", {})
+        sandbox_dir = ctx.get("_sandbox_dir") if isinstance(ctx, dict) else None
+        if sandbox_dir:
+            import shutil
+
+            shutil.rmtree(sandbox_dir, ignore_errors=True)
+            log.info("rejected change %s: cleaned sandbox %s", change_id, sandbox_dir)
+
     await _write_audit(
         "reject_claude_change",
         "user",

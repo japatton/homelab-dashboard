@@ -17,6 +17,42 @@ INTEGRATIONS_DIR = Path(
 )
 
 
+def _claude_subprocess_env() -> dict[str, str]:
+    """F-020: build a minimal environment for the Claude CLI subprocess.
+
+    The previous implementation passed the full os.environ, which exposed
+    DASHBOARD_TOKEN, OPENVAS_PASS, UNIFI_PASS, ES_PASS, OPNsense and
+    Firewalla creds, the Anthropic API key, DOCKER_GID, and every other
+    env var set in the backend's .env to the CLI subprocess. The CLI
+    doesn't need any of that — it just needs PATH (to find its own deps)
+    and ANTHROPIC_API_KEY (to authenticate to the Anthropic API). HOME
+    is set to a tempdir so the CLI doesn't try to write cache files
+    into the read-only container root.
+
+    Least-privilege subprocess env. Even if the CLI binary or one of
+    its transitive deps were compromised, none of the dashboard's
+    secrets would be readable from /proc/<pid>/environ.
+    """
+    env: dict[str, str] = {
+        "PATH": os.environ.get(
+            "PATH",
+            "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        ),
+        "HOME": "/tmp",
+        "CLAUDE_NONINTERACTIVE": "1",
+    }
+    # Pass through ONLY the Anthropic credential the CLI actually needs.
+    # The CLI looks for ANTHROPIC_API_KEY by convention; if .env uses
+    # the dashboard's CLAUDE_API_KEY name, we map it across so the CLI
+    # finds it without leaking its sibling vars.
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get(
+        "CLAUDE_API_KEY", ""
+    )
+    if api_key:
+        env["ANTHROPIC_API_KEY"] = api_key
+    return env
+
+
 def _build_prompt(device_context: dict) -> str:
     ip = device_context.get("ip", "unknown")
     ports = device_context.get("open_ports", [])
@@ -84,7 +120,7 @@ async def run_via_cli(prompt: str, sandbox: Path) -> Optional[str]:
             cwd=str(sandbox),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, "CLAUDE_NONINTERACTIVE": "1"},
+            env=_claude_subprocess_env(),
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
         if proc.returncode != 0:
