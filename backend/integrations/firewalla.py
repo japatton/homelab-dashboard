@@ -262,9 +262,29 @@ class FirewallaIntegration(BaseIntegration):
             }
         return {}
 
+    def _effective_verify_ssl(self) -> bool:
+        """F-014: MSP mode talks to https://<msp_domain>/v2 — a public
+        Firewalla cloud endpoint with a real-CA cert. There is no
+        legitimate reason to skip verification for MSP, so we always
+        verify regardless of how the operator set the schema flag.
+
+        Local mode talks to the box on its LAN port, which typically
+        ships a self-signed cert (or an undocumented one). For local
+        mode we honour `verify_ssl` so the operator can opt in once
+        they've actually put a trusted cert on the box.
+
+        The schema's single `verify_ssl` field is preserved (no
+        migration); the override happens at integration-class level
+        so MSP can't accidentally be downgraded to insecure by the
+        Settings UI's default.
+        """
+        if self._mode == "msp":
+            return True
+        return self._verify_ssl
+
     def _client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
-            verify=self._verify_ssl,
+            verify=self._effective_verify_ssl(),
             headers=self._headers(),
             timeout=httpx.Timeout(15.0, connect=5.0),
             follow_redirects=True,

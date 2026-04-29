@@ -43,6 +43,56 @@ def _integ() -> FirewallaIntegration:
     )
 
 
+class TestEffectiveVerifySSL:
+    """F-014: MSP mode forces TLS verification regardless of the schema
+    flag — the Firewalla MSP cloud has a real-CA cert and there's no
+    legitimate reason to skip verification. Local mode honours the
+    flag because that's where self-signed certs actually live.
+
+    Without this override, the schema's `verify_ssl=False` default
+    silently disables cert validation against the public MSP cloud,
+    which makes the PAT MITM-able by anyone between the dashboard's
+    egress and Firewalla's API."""
+
+    def test_msp_mode_always_verifies_even_when_flag_is_false(self):
+        integ = FirewallaIntegration(
+            mode="msp",
+            msp_domain=_DOMAIN,
+            msp_token="pat_abc123",
+            verify_ssl=False,  # operator left the toggle off — we override
+        )
+        assert integ._effective_verify_ssl() is True
+
+    def test_msp_mode_verifies_when_flag_is_true(self):
+        integ = FirewallaIntegration(
+            mode="msp",
+            msp_domain=_DOMAIN,
+            msp_token="pat_abc123",
+            verify_ssl=True,
+        )
+        assert integ._effective_verify_ssl() is True
+
+    def test_local_mode_honours_flag_false(self):
+        # Self-signed local-box cert is the documented case; flag wins.
+        integ = FirewallaIntegration(
+            mode="local",
+            local_url="http://192.168.1.1:8833",
+            local_token="tok",
+            verify_ssl=False,
+        )
+        assert integ._effective_verify_ssl() is False
+
+    def test_local_mode_honours_flag_true(self):
+        # Operator put a real cert on their box; flag wins.
+        integ = FirewallaIntegration(
+            mode="local",
+            local_url="https://firewalla.lan:8833",
+            local_token="tok",
+            verify_ssl=True,
+        )
+        assert integ._effective_verify_ssl() is True
+
+
 class TestAuthHeader:
     """The single rule that's easy to mess up and breaks everything:
     `Authorization: Token <pat>`, not `Bearer <pat>`."""
