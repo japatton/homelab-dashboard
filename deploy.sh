@@ -14,15 +14,17 @@ ENV_FILE=".env"
 # REMOTE_DIR resolved after SSH connection (uses remote $HOME, no sudo needed)
 # Override with DEPLOY_DIR env var if desired
 
-# Default service ports — individual vars for bash 3.2/macOS compatibility
+# Default service ports — individual vars for bash 3.2/macOS compatibility.
+# F-028: dropped DEFAULT_OPENVAS_HTTP_PORT — the OpenVAS :9392 mapping is no
+# longer published from compose (the dashboard talks to gvmd on 9390 over
+# the docker network instead), so there's nothing on the host to deconflict.
 DEFAULT_FRONTEND_PORT=8080
 DEFAULT_BACKEND_PORT=8000
 DEFAULT_NPM_HTTP_PORT=80
 DEFAULT_NPM_HTTPS_PORT=443
 DEFAULT_NPM_ADMIN_PORT=8181
-DEFAULT_OPENVAS_HTTP_PORT=9392
 
-PORT_VARS="FRONTEND_PORT BACKEND_PORT NPM_HTTP_PORT NPM_HTTPS_PORT NPM_ADMIN_PORT OPENVAS_HTTP_PORT"
+PORT_VARS="FRONTEND_PORT BACKEND_PORT NPM_HTTP_PORT NPM_HTTPS_PORT NPM_ADMIN_PORT"
 
 # ─── Colors ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -251,9 +253,13 @@ $SSH_CMD "$TARGET_HOST" bash << REMOTE
   # already correct), non-destructive (just ownership, data untouched).
   if docker volume inspect homelab-dashboard_homelab-data >/dev/null 2>&1; then
     echo "  Reconciling /data ownership for non-root backend..."
+    # F-026: pinned to match docker-compose.yml's data-init sidecar.
+    # Both run the same chown, both are tiny one-shots — pinning
+    # avoids the supply-chain footgun of pulling whatever the latest
+    # busybox happens to be on each deploy.
     docker run --rm \
       -v homelab-dashboard_homelab-data:/data \
-      busybox:latest \
+      busybox:1.37 \
       chown -R 1000:1000 /data 2>/dev/null || \
       echo "  (chown failed — backend entrypoint will retry at startup)"
   fi

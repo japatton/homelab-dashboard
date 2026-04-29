@@ -141,7 +141,12 @@ services:
       retries: 3
 
   nginx-proxy-manager:
-    image: jc21/nginx-proxy-manager:latest
+    # F-026: pin NPM to a specific version. :latest pulled a fresh image
+    # on every docker compose pull / rebuild, which is exactly the
+    # supply-chain footgun that bit `immauss/openvas` before we pinned
+    # it (review-fixes.md item 8). NPM follows semver-ish; 2.12.x is
+    # the current stable line. Bump deliberately after testing locally.
+    image: jc21/nginx-proxy-manager:2.12.3
     container_name: homelab-npm
     restart: unless-stopped
     profiles:
@@ -176,8 +181,18 @@ services:
     restart: unless-stopped
     profiles:
       - openvas
-    ports:
-      - "${OPENVAS_HTTP_PORT:-9392}:9392"
+    # F-028: removed the `ports: ["${OPENVAS_HTTP_PORT:-9392}:9392"]`
+    # mapping. The dashboard talks to gvmd's GMP port (9390) over the
+    # docker network, never via the published host port. The :9392
+    # mapping was leftover from when the immauss image served a web
+    # UI on that port — that's now gone, so all the mapping did was
+    # publish "whatever the container chose to listen on" to the host
+    # interface. With BACKEND_BIND=127.0.0.1: restricting the dashboard
+    # itself for tunnel exposure, leaving openvas's port mapped
+    # would re-expose a separate, ungated surface.
+    #
+    # If a future operator wants the OpenVAS web UI exposed for any
+    # reason, they can add the mapping back themselves.
     environment:
       - USERNAME=${OPENVAS_USER:-admin}
       - PASSWORD=${OPENVAS_PASS:-changeme}
